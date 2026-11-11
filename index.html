@@ -1,0 +1,1430 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>Narrativa en la música</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: un disco que se recorre pista por pista. Cada pista es una escena a pantalla completa
+   (Lado A = teoría de Moliné, Lado B = herramientas con juego y ejemplos). Estudio analógico
+   con estética de revista: papel gris cálido, tinta, fotos en B/N simuladas y una señal roja. */
+:root{
+  --paper:#e8e5de;      /* papel gris cálido de los referentes */
+  --paper-2:#dad6cc;    /* papel en sombra, superficies */
+  --paper-3:#f3f1ec;    /* papel claro, tarjetas */
+  --ink:#151413;        /* tinta */
+  --ink-2:#4b4843;      /* tinta suave */
+  --ink-3:#86827a;      /* notas */
+  --signal:#e9481f;     /* rojo-naranja de señal, el acento */
+  --volt:#c6ea3b;       /* verde limón, solo en LEDs y medidores */
+  --line:rgba(21,20,19,.16);
+  --display:"Anton","Impact","Arial Narrow Bold",sans-serif;
+  --body:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Space Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;
+  overflow:hidden;-webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--signal);outline-offset:3px}
+.mono{font-family:var(--mono)}
+
+/* grano de papel */
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:90;opacity:.22;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.09 0 0 0 0 0.08 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- barra superior ---------- */
+.top{
+  position:fixed;left:0;right:0;top:0;z-index:50;
+  padding:calc(10px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));
+  display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  pointer-events:none;
+}
+.top > *{pointer-events:auto}
+.brand{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.led{width:9px;height:9px;border-radius:50%;background:#9b978e;box-shadow:inset 0 1px 1px rgba(0,0,0,.3)}
+.led.on{background:var(--signal);box-shadow:0 0 0 3px rgba(233,72,31,.18),0 0 12px var(--signal)}
+.onair{border:1px solid var(--ink);padding:3px 7px;border-radius:3px;font-weight:700;opacity:.25;transition:opacity .3s,background .3s,color .3s}
+.onair.on{opacity:1;background:var(--signal);border-color:var(--signal);color:var(--paper-3)}
+.where{flex:1;text-align:center;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tools{display:flex;align-items:center;gap:8px}
+.tbtn{background:var(--paper-3);border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.tbtn:hover{border-color:var(--ink)}
+.tbtn[aria-pressed="false"]{color:var(--ink-3)}
+#vu{width:64px;height:22px;display:block}
+@media (max-width:720px){.where,.brand .name{display:none}#vu{display:none}}
+
+/* ---------- escenas ---------- */
+.stage{position:fixed;inset:0;overflow:hidden}
+.scene{
+  position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
+  padding:calc(64px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(84px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  visibility:hidden;opacity:0;transform:scale(.94);filter:blur(6px);
+  transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1),filter .7s,visibility 0s .9s;
+}
+.scene.active{visibility:visible;opacity:1;transform:none;filter:none;transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1),filter .7s,visibility 0s}
+.scene.gone{transform:scale(1.08)}
+.inner{max-width:1240px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;justify-content:center;gap:24px}
+
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.eyebrow b{color:var(--signal);font-weight:700}
+.big{font-family:var(--display);font-weight:400;text-transform:uppercase;line-height:.92;letter-spacing:.005em;margin:0;text-wrap:balance}
+.h1{font-size:clamp(48px,9vw,132px)}
+.h2{font-size:clamp(40px,6.4vw,92px)}
+.h3{font-size:clamp(28px,3.4vw,46px)}
+.wave .ww{display:inline-block;white-space:nowrap}
+.wave .l{display:inline-block;animation:wave 2.6s ease-in-out infinite;animation-delay:calc(var(--i) * 70ms)}
+@keyframes wave{0%,100%{transform:translateY(0)}50%{transform:translateY(-.06em)}}
+.lede{font-size:clamp(17px,1.6vw,22px);line-height:1.45;max-width:58ch;margin:0;text-wrap:pretty}
+.note{font-family:var(--mono);font-size:12px;color:var(--ink-3);letter-spacing:.04em}
+
+/* ---------- navegación inferior ---------- */
+.bottom{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  display:flex;align-items:center;gap:14px;
+}
+.navbtn{width:46px;height:46px;border-radius:50%;border:1px solid var(--ink);background:var(--paper-3);cursor:pointer;display:grid;place-items:center;flex-shrink:0;transition:background .2s,color .2s}
+.navbtn:hover{background:var(--ink);color:var(--paper-3)}
+.navbtn svg{width:18px;height:18px}
+.groove{flex:1;position:relative;height:46px;display:flex;align-items:center;gap:4px;min-width:0}
+.groove::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line)}
+.dot{position:relative;flex:1;height:22px;border:0;background:none;cursor:pointer;padding:0;min-width:0}
+.dot::after{content:"";position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;transform:translate(-50%,-50%);background:var(--paper-2);border:1px solid var(--ink-3);transition:all .3s}
+.dot.side::after{width:3px;height:16px;border-radius:2px;background:var(--ink);border:0}
+.dot.done::after{background:var(--ink);border-color:var(--ink)}
+.dot.here::after{width:13px;height:13px;background:var(--signal);border-color:var(--signal);box-shadow:0 0 0 4px rgba(233,72,31,.18)}
+.dot .tip{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);white-space:nowrap;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper-3);padding:4px 7px;border-radius:3px;opacity:0;pointer-events:none;transition:opacity .2s}
+.dot:hover .tip{opacity:1}
+.stepper{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--ink-2);white-space:nowrap}
+
+/* ---------- lista de pistas ---------- */
+.tracklist{position:fixed;inset:0;z-index:80;background:rgba(21,20,19,.55);display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.sleeve-back{background:var(--paper-3);width:min(880px,100%);max-height:100%;overflow:auto;border-radius:6px;padding:28px;display:grid;gap:18px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+.sleeve-back header{display:flex;justify-content:space-between;align-items:start;gap:16px}
+.tl-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:24px}
+.tl-col h4{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;margin:0 0 8px;color:var(--signal)}
+.tl-col ol{list-style:none;margin:0;padding:0;display:grid}
+.tl-col button{display:flex;gap:12px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:9px 0;cursor:pointer;font-size:15px}
+.tl-col button:hover span:last-child{color:var(--signal)}
+.tl-col button .n{font-family:var(--mono);font-size:12px;color:var(--ink-3);width:34px;flex-shrink:0;padding-top:2px}
+
+/* ---------- PORTADA: tocadiscos ---------- */
+.cover .inner{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);align-items:center;gap:clamp(20px,4vw,64px)}
+@media (max-width:860px){.cover .inner{grid-template-columns:1fr}}
+.deck{position:relative;width:min(100%,560px);aspect-ratio:1.18/1;justify-self:center;transition:transform 1.4s cubic-bezier(.6,0,.2,1)}
+.plinth{position:absolute;inset:0;border-radius:18px;background:linear-gradient(160deg,#f6f5f1,#cfcbc2 60%,#bdb8ad);box-shadow:0 30px 60px -20px rgba(0,0,0,.45),inset 0 1px 0 #fff,inset 0 -2px 0 rgba(0,0,0,.08)}
+.plinth::after{content:"";position:absolute;inset:10px;border-radius:12px;border:1px solid rgba(0,0,0,.08)}
+.platter{position:absolute;left:6%;top:9%;width:70%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,#2a2826 0 30%,#1a1918 31%);box-shadow:0 8px 20px rgba(0,0,0,.4)}
+.vinyl{position:absolute;inset:2%;border-radius:50%;
+  background:
+   radial-gradient(circle at 35% 30%,rgba(255,255,255,.18),transparent 32%),
+   repeating-radial-gradient(circle,#121110 0 1.2px,#1d1c1a 1.6px 2.6px),
+   #151413;
+}
+.vinyl.spin{animation:spin 1.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.label{position:absolute;left:50%;top:50%;width:36%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:var(--signal);display:grid;place-items:center;text-align:center;color:var(--paper-3);overflow:hidden}
+.label::after{content:"";position:absolute;width:6%;aspect-ratio:1;border-radius:50%;background:var(--paper)}
+.label .lt{font-family:var(--display);font-size:clamp(11px,1.6vw,20px);line-height:.95;text-transform:uppercase;transform:translateY(-34%)}
+.label .lb{position:absolute;bottom:16%;font-family:var(--mono);font-size:clamp(6px,.7vw,9px);letter-spacing:.14em}
+.arm{position:absolute;right:8%;top:8%;width:12%;aspect-ratio:1;transform-origin:50% 50%;transform:rotate(-28deg);transition:transform 1.2s cubic-bezier(.5,0,.2,1);cursor:pointer;z-index:3}
+.arm.down{transform:rotate(4deg)}
+.arm svg{position:absolute;left:0;top:0;width:100%;overflow:visible}
+.knob{position:absolute;width:7%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 40% 35%,#fbfaf7,#b3aea4);box-shadow:0 2px 4px rgba(0,0,0,.3)}
+.k1{right:9%;bottom:12%}.k2{right:19%;bottom:12%}
+.rpm{position:absolute;left:8%;bottom:6.5%;font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ink-2);display:flex;gap:10px}
+.rpm i{font-style:normal;padding:2px 5px;border:1px solid var(--line);border-radius:3px}
+.rpm i.on{background:var(--ink);color:var(--paper-3)}
+.cover .copy{display:grid;gap:20px;align-content:center}
+.drop{justify-self:start;display:inline-flex;align-items:center;gap:12px;background:var(--ink);color:var(--paper-3);border:0;border-radius:999px;padding:14px 22px;font-family:var(--mono);font-size:13px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+.drop:hover{background:var(--signal)}
+.drop .ring{width:10px;height:10px;border-radius:50%;background:var(--signal);box-shadow:0 0 0 0 rgba(233,72,31,.6);animation:ping 1.6s infinite}
+@keyframes ping{to{box-shadow:0 0 0 14px rgba(233,72,31,0)}}
+.credits{display:flex;flex-wrap:wrap;gap:8px 20px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.zooming .deck{transform:scale(3.2) translate(-8%,1%)}
+.zooming .copy{opacity:0;transition:opacity .4s}
+
+/* ---------- TORMENTA ---------- */
+.storm canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.storm .inner{position:relative;align-items:flex-start}
+.stormsteps{display:flex;gap:6px;flex-wrap:wrap}
+.stormsteps i{width:34px;height:6px;border-radius:3px;background:var(--paper-2);transition:background .3s}
+.stormsteps i.on{background:var(--ink)}
+.stormsteps i.cur{background:var(--signal)}
+.action{font-family:var(--display);font-size:clamp(56px,11vw,170px);line-height:.9;text-transform:uppercase;margin:0;min-height:1.8em;display:flex;align-items:flex-end}
+.howto{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px;width:100%;max-width:980px}
+.howto div{border-top:2px solid var(--ink);padding-top:8px;font-size:14px}
+.howto div b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin-bottom:2px}
+.howto div.on{border-color:var(--signal)}
+
+/* ---------- LADO A: abanico de tarjetas ---------- */
+.side-a .inner{gap:12px}
+.side-a .h2{font-size:clamp(32px,4.4vw,62px)}
+.side-a .fcard{bottom:3%}
+.fanwrap{position:relative;height:min(64vh,600px);min-height:430px;perspective:1600px}
+.fcard{position:absolute;left:50%;bottom:-4%;width:min(500px,88vw);height:min(60vh,540px);min-height:400px;margin-left:calc(min(500px,88vw) / -2);transform-origin:50% 160%;transition:transform .8s cubic-bezier(.2,.75,.2,1),opacity .6s;cursor:pointer;border:0;padding:0;background:none;text-align:left}
+.fflip{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .8s cubic-bezier(.2,.75,.2,1)}
+.fcard.flipped .fflip{transform:rotateY(180deg)}
+.fface{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:10px;overflow:hidden;padding:26px;display:flex;flex-direction:column;gap:14px;box-shadow:0 24px 50px -18px rgba(0,0,0,.45)}
+.ffront{background:var(--paper-3);border:1px solid var(--line);overflow-y:auto;gap:10px}
+.ffront .ftext{font-size:clamp(14px,1.1vw,16.5px)}
+.ffront .photo{height:64px}
+.ffront .ftitle{font-size:clamp(28px,2.8vw,40px)}
+.fback{background:var(--ink);color:var(--paper-3);transform:rotateY(180deg)}
+.fnum{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;display:flex;justify-content:space-between}
+.fnum b{color:var(--signal)}
+.ftitle{font-family:var(--display);font-size:clamp(34px,3.6vw,50px);line-height:.95;text-transform:uppercase;margin:0}
+.ftext{font-size:clamp(15px,1.25vw,18px);line-height:1.45;margin:0}
+.fback .ftext{font-size:clamp(14px,1.1vw,16px)}
+.fback{overflow-y:auto;gap:10px}
+.fback .ftitle{font-size:clamp(26px,2.6vw,36px)}
+.fex{display:block;color:var(--signal);font-size:clamp(14px,1.1vw,16px);line-height:1.4;border-left:2px solid var(--signal);padding-left:10px}
+.fex b{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;margin-bottom:2px}
+.fwho{margin-top:auto;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-3);border-top:1px solid var(--line);padding-top:10px}
+.fback .fwho{color:#bdb8ad;border-color:rgba(255,255,255,.18)}
+.fhint{margin-top:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal)}
+.photo{height:96px;border-radius:6px;background:
+  radial-gradient(circle at var(--px,30%) 40%,rgba(255,255,255,.35),transparent 40%),
+  repeating-linear-gradient(var(--pa,90deg),rgba(0,0,0,.07) 0 2px,transparent 2px 6px),
+  linear-gradient(135deg,#bdb8ad,#6f6b64);filter:grayscale(1) contrast(1.1);position:relative;overflow:hidden;flex-shrink:0}
+.photo::after{content:attr(data-glyph);position:absolute;right:12px;bottom:-14px;font-family:var(--display);font-size:92px;line-height:1;color:rgba(21,20,19,.75)}
+.fan-controls{display:flex;justify-content:center;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* ---------- LADO B: tesis ---------- */
+.thesis{width:100%;border-collapse:collapse;font-size:clamp(14px,1.2vw,17px)}
+.thesis th{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;text-align:left;color:var(--ink-2);padding:0 12px 8px 0;border-bottom:2px solid var(--ink)}
+.thesis td{padding:10px 12px 10px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.thesis td:first-child{font-family:var(--display);font-size:clamp(18px,1.8vw,26px);text-transform:uppercase;white-space:nowrap;line-height:1}
+.thesis tr{transition:background .2s;cursor:pointer}
+.thesis tbody tr:hover td{background:rgba(233,72,31,.07)}
+.tablewrap{overflow-x:auto;width:100%}
+
+/* ---------- conceptos ---------- */
+.concept .inner{justify-content:flex-start;padding-top:8px}
+.chead{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:clamp(18px,3vw,48px);align-items:start}
+@media (max-width:980px){.chead{grid-template-columns:1fr}}
+.ctext{display:grid;gap:14px;align-content:start}
+.layer{display:grid;gap:4px;border-top:1px solid var(--ink);padding-top:10px}
+.layer > span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+.layer p{margin:0;max-width:62ch}
+.layer.simple p{font-size:clamp(18px,1.7vw,24px);line-height:1.35;font-weight:500}
+.layer.precise p{font-size:clamp(14px,1.15vw,16px);color:var(--ink-2)}
+.ctext,.chead > *{min-width:0}
+.chip{display:inline-block;justify-self:start;font-family:var(--mono);font-size:11px;line-height:1.5;letter-spacing:.04em;border:1px solid var(--ink);border-radius:14px;padding:5px 12px;max-width:100%}
+.chip b{color:var(--signal)}
+
+/* consola de juego */
+.console{background:linear-gradient(180deg,#f7f6f2,#e3dfd6);border:1px solid rgba(21,20,19,.22);border-radius:14px;padding:18px;display:grid;gap:14px;box-shadow:0 18px 40px -22px rgba(0,0,0,.5),inset 0 1px 0 #fff;min-width:0}
+.console header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.console h4{margin:0;font-family:var(--display);font-weight:400;font-size:26px;text-transform:uppercase;line-height:1}
+.console .tag{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;background:var(--ink);color:var(--paper-3);padding:4px 8px;border-radius:3px}
+.console p.how{margin:0;font-size:14px;color:var(--ink-2)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pbtn{background:var(--ink);color:var(--paper-3);border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+.pbtn:hover{background:var(--signal)}
+.pbtn.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink)}
+.pbtn.ghost:hover{background:var(--ink);color:var(--paper-3)}
+.pbtn.on{background:var(--signal)}
+.status{font-family:var(--mono);font-size:12px;letter-spacing:.06em;min-height:1.5em;color:var(--ink)}
+.status b{color:var(--signal)}
+.fader{display:grid;gap:4px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;min-width:0}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--ink) var(--v,50%),#bdb8ad var(--v,50%))}
+input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#bdb8ad}
+input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--ink)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:26px;margin-top:-10px;border-radius:3px;background:linear-gradient(180deg,#fdfcfa,#c9c4ba);border:1px solid var(--ink);box-shadow:0 2px 3px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-thumb{width:16px;height:26px;border-radius:3px;background:#efece6;border:1px solid var(--ink)}
+
+/* pads de instrumentos */
+.pads{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.pad{aspect-ratio:1;border-radius:12px;border:1px solid var(--ink);background:var(--paper-3);cursor:pointer;display:grid;place-items:center;align-content:center;gap:4px;padding:6px;transition:transform .08s,background .15s,color .15s,box-shadow .15s}
+.pad svg{width:44%;height:auto}
+.pad span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.pad kbd{font-family:var(--mono);font-size:9px;color:var(--ink-3)}
+.pad.lit{background:var(--signal);color:var(--paper-3);box-shadow:0 0 0 4px rgba(233,72,31,.25);transform:scale(.96)}
+.pad.lit kbd{color:var(--paper-3)}
+@media (max-width:480px){.pads{grid-template-columns:repeat(2,minmax(0,1fr))}.pad{aspect-ratio:1.6}}
+
+/* secuenciador */
+.seq{display:grid;grid-template-columns:72px repeat(8,minmax(0,1fr));gap:5px;align-items:center}
+.seq .rl{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.cell{aspect-ratio:1;border-radius:5px;border:1px solid rgba(21,20,19,.35);background:var(--paper-3);cursor:pointer;padding:0;transition:background .1s}
+.cell:nth-child(9n+6),.cell:nth-child(9n+7),.cell:nth-child(9n+8),.cell:nth-child(9n+9){background:#ece9e2}
+.cell.on{background:var(--ink)!important}
+.cell.play{box-shadow:0 0 0 2px var(--signal)}
+.cell.on.play{background:var(--signal)!important}
+
+/* personajes leitmotiv */
+.chars{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.char{border:1px solid var(--ink);border-radius:10px;background:var(--paper-3);padding:10px;display:grid;gap:6px;cursor:pointer;text-align:left;transition:transform .2s,background .2s,color .2s}
+.char .face{height:64px;border-radius:6px;display:grid;place-items:center;font-family:var(--display);font-size:38px;color:var(--paper-3)}
+.char b{font-family:var(--display);font-weight:400;font-size:20px;text-transform:uppercase;line-height:1}
+.char small{font-family:var(--mono);font-size:10px;color:var(--ink-2)}
+.char.lit{transform:translateY(-4px);box-shadow:0 0 0 3px var(--signal)}
+.char.right{background:var(--volt)}
+.char.wrong{background:#f2c4b6}
+@media (max-width:480px){.char .face{height:44px;font-size:26px}}
+
+/* coro */
+.faces{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
+.vface{aspect-ratio:1;border-radius:50%;background:var(--paper-2);border:1px solid var(--ink-3);position:relative;transition:background .3s}
+.vface::after{content:"";position:absolute;left:50%;top:58%;width:30%;height:6%;border-radius:4px;background:var(--ink-3);transform:translate(-50%,-50%);transition:height .2s}
+.vface.on{background:var(--ink);border-color:var(--ink)}
+.vface.on::after{background:var(--signal);height:26%;border-radius:50%;animation:sing 1.4s ease-in-out infinite;animation-delay:calc(var(--i) * -90ms)}
+@keyframes sing{50%{height:14%}}
+
+/* ópera */
+.roles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.role{border:1px solid var(--ink);border-radius:10px;background:var(--paper-3);padding:10px 8px;cursor:pointer;display:grid;gap:4px;text-align:center}
+.role b{font-family:var(--display);font-weight:400;font-size:17px;text-transform:uppercase;line-height:1}
+.role small{font-family:var(--mono);font-size:9px;letter-spacing:.06em;color:var(--ink-2)}
+.role.on{background:var(--ink);color:var(--paper-3)}
+.role.on small{color:#bdb8ad}
+.role.sing{box-shadow:0 0 0 3px var(--signal)}
+@media (max-width:480px){.roles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.staff{height:52px;border-radius:6px;background:repeating-linear-gradient(180deg,transparent 0 9px,rgba(21,20,19,.25) 9px 10px);position:relative;overflow:hidden}
+.staff i{position:absolute;width:9px;height:7px;border-radius:50%;background:var(--ink);transition:opacity .4s}
+
+/* copla */
+.karaoke{display:grid;gap:8px}
+.verse{border-left:3px solid var(--paper-2);padding:4px 10px;font-size:14px;line-height:1.4;color:var(--ink-3);white-space:pre-line;transition:all .3s}
+.verse.cur{border-color:var(--signal);color:var(--ink);background:rgba(233,72,31,.06)}
+.melodybar{display:flex;gap:3px;height:28px;align-items:flex-end}
+.melodybar i{flex:1;background:var(--ink-3);border-radius:2px 2px 0 0;transition:background .1s}
+.melodybar i.on{background:var(--signal)}
+textarea{width:100%;min-height:120px;font:14px/1.4 var(--body);border:1px solid var(--ink-3);border-radius:8px;padding:10px;background:var(--paper-3);color:var(--ink);resize:vertical}
+
+/* atmósfera */
+.mixer{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:480px){.mixer{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* improvisación */
+.keys{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:5px}
+.key{height:96px;border-radius:0 0 8px 8px;border:1px solid var(--ink);background:linear-gradient(180deg,#fdfcfa,#e9e6df);cursor:pointer;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:8px;gap:2px;transition:background .08s}
+.key span{font-family:var(--mono);font-size:11px}
+.key kbd{font-family:var(--mono);font-size:9px;color:var(--ink-3)}
+.key.lit{background:var(--signal);color:var(--paper-3)}
+#improvTrail{width:100%;height:70px;display:block;border-radius:6px;background:#ece9e2}
+
+/* ejemplos: carrusel de carátulas */
+.examples{display:grid;gap:10px;border-top:1px solid var(--ink);padding-top:12px}
+.examples > header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.examples h5{margin:0;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);font-weight:400}
+.flow{position:relative;height:170px;perspective:1000px;overflow:hidden}
+.sleeve{position:absolute;left:50%;top:6px;width:150px;height:150px;margin-left:-75px;border:0;padding:0;border-radius:4px;cursor:pointer;transition:transform .6s cubic-bezier(.2,.75,.2,1),opacity .5s,filter .5s;overflow:hidden;box-shadow:0 14px 26px -12px rgba(0,0,0,.55);text-align:left}
+.sleeve .art{position:absolute;inset:0}
+.sleeve .ico{position:absolute;left:50%;top:40%;width:58px;height:58px;transform:translate(-50%,-50%);filter:drop-shadow(0 1px 0 rgba(0,0,0,.15))}
+.sleeve .st{position:absolute;left:10px;right:10px;bottom:9px;font-family:var(--display);font-size:19px;line-height:.95;text-transform:uppercase}
+.sleeve .yr{position:absolute;left:10px;top:9px;font-family:var(--mono);font-size:10px;letter-spacing:.1em}
+.sleeve .cls{position:absolute;right:8px;top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;background:var(--signal);color:var(--paper-3);padding:2px 5px;border-radius:2px}
+.exinfo{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;align-items:center;min-height:62px}
+.exinfo .t{font-weight:700;font-size:16px}
+.exinfo .m{font-family:var(--mono);font-size:11px;color:var(--ink-2);letter-spacing:.04em}
+.exinfo .m b{color:var(--signal);font-weight:700}
+.exinfo .w{grid-column:1/-1;font-size:14px;color:var(--ink-2);margin:0}
+.yt{display:inline-flex;align-items:center;gap:8px;background:var(--signal);color:var(--paper-3);text-decoration:none;border-radius:999px;padding:9px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.yt:hover{background:var(--ink)}
+.flownav{display:flex;gap:6px}
+.flownav button{width:34px;height:34px;border-radius:50%;border:1px solid var(--ink);background:var(--paper-3);cursor:pointer}
+
+/* reproductor */
+.player{position:fixed;inset:0;z-index:85;background:rgba(21,20,19,.78);display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.player-box{width:min(1100px,100%);background:var(--paper-3);border-radius:8px;padding:12px;display:grid;gap:10px}
+.player-box header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;letter-spacing:.06em}
+.player-frame{position:relative;aspect-ratio:16/9;background:#000;border-radius:4px;overflow:hidden}
+.player-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+/* ustedes / cierre / notas */
+.qrbox{display:grid;grid-template-columns:auto minmax(0,1fr);gap:clamp(18px,4vw,56px);align-items:center}
+@media (max-width:760px){.qrbox{grid-template-columns:1fr}}
+#qr{background:var(--paper-3);padding:16px;border-radius:10px;border:1px solid var(--ink);width:max-content}
+#qr img,#qr canvas{display:block;width:220px;height:220px}
+.gamelist{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px}
+.gamelist button{text-align:left;border:1px solid var(--ink);border-radius:10px;background:var(--paper-3);padding:12px;cursor:pointer;display:grid;gap:2px}
+.gamelist button b{font-family:var(--display);font-weight:400;font-size:22px;text-transform:uppercase;line-height:1}
+.gamelist button span{font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.gamelist button:hover{background:var(--ink);color:var(--paper-3)}
+.gamelist button:hover span{color:#bdb8ad}
+.quote{font-family:var(--display);font-size:clamp(34px,5.2vw,78px);line-height:.98;text-transform:uppercase;margin:0;text-wrap:balance}
+.quote em{font-style:normal;color:var(--signal)}
+.eco{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.eco{grid-template-columns:1fr}}
+.eco div{border-top:2px solid var(--ink);padding-top:8px;display:grid;gap:4px}
+.eco b{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.eco p{margin:0;font-size:15px;color:var(--ink-2)}
+.liner{columns:2 320px;column-gap:40px;font-size:14px}
+.liner h4{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 8px;break-after:avoid}
+.liner ul{list-style:none;margin:0 0 22px;padding:0}
+.liner li{padding:5px 0;border-top:1px solid var(--line);break-inside:avoid}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition-duration:.01ms!important}
+}
+</style>
+
+<header class="top">
+  <div class="brand"><span class="led" id="led"></span><span class="name">Narrativa en la música</span><span class="onair" id="onair">On air</span></div>
+  <div class="where" id="where">Lado A</div>
+  <div class="tools">
+    <canvas id="vu" width="128" height="44" aria-hidden="true"></canvas>
+    <button class="tbtn" id="soundBtn" type="button" aria-pressed="true">Sonido: sí</button>
+    <button class="tbtn" id="listBtn" type="button">Pistas</button>
+    <button class="tbtn" id="fsBtn" type="button" title="Pantalla completa (F)">⤢</button>
+  </div>
+</header>
+
+<main class="stage" id="stage"></main>
+
+<nav class="bottom" aria-label="Navegación">
+  <button class="navbtn" id="prevBtn" type="button" aria-label="Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <div class="groove" id="groove"></div>
+  <span class="stepper" id="stepper"></span>
+  <button class="navbtn" id="nextBtn" type="button" aria-label="Siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>
+</nav>
+
+<div class="player" id="player" hidden>
+  <div class="player-box" role="dialog" aria-label="Fragmento">
+    <header><b id="playerTitle"></b><span><a id="playerLink" class="tbtn" href="#" target="_blank" rel="noopener">Abrir en YouTube ↗</a> <button class="tbtn" id="playerClose" type="button">Cerrar</button></span></header>
+    <div class="player-frame" id="playerFrame"></div>
+  </div>
+</div>
+<div class="tracklist" id="tracklist" hidden>
+  <div class="sleeve-back" role="dialog" aria-label="Lista de pistas">
+    <header><div><div class="eyebrow">Contracarátula</div><h2 class="big h3">Lista de pistas</h2></div><button class="tbtn" id="closeList" type="button">Cerrar</button></header>
+    <div class="tl-cols" id="tlCols"></div>
+    <p class="note">Flechas del teclado, barra espaciadora o clicker para avanzar · F pantalla completa · Esc cierra esta lista</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+/* =========================================================
+   CONTENIDO
+   ========================================================= */
+// Enlace público del sitio (se actualiza al publicar)
+const SHARE_URL = "https://doblepunta.github.io/narrativa-musica/";
+// En GitHub Pages los videos se reproducen dentro del sitio; en claude.ai se abren en YouTube
+const CAN_EMBED = !/claude/i.test(location.hostname) && location.protocol.startsWith("http");
+
+const yt = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
+
+const ACTO_I = [
+  {"t": "La pregunta", "g": "?", "s": "Pones una canción sin letra, solo instrumentos, y sientes que «pasa algo»: todo está tranquilo, luego se pone tenso, estalla y al final se calma. Parece que te contaran una historia. Pero si te preguntan «¿de qué se trataba?, ¿quién era el protagonista?», no puedes responder: la música no te dijo nombres ni lugares. La pregunta del texto es: ¿la música cuenta historias de verdad, o solo nos parece? Julieta Moliné es clarinetista, y sus profesores le decían cosas como «toca esta parte como si alguien estuviera triste». Ella quería saber si eso tenía sentido o era puro invento.", "a": "El problema es si existe una narratología musical (una forma de narrar propia de la música) o si «narración musical» es solo una metáfora útil. Steiner: la música tiene su propia sintaxis, pero su organización en el tiempo se parece a la del lenguaje. Algunos profesores, como Gingras, hasta le ponen letra a la música instrumental para enseñar a frasear.", "w": "Moliné (2020) · Steiner · Gingras · Chion", "e": "La tormenta que acabamos de hacer: tuvo inicio, clímax y final, sin una sola palabra. ¿Quién era el protagonista?"},
+  {"t": "Forma de cuento, sin cuento", "g": "N", "s": "La música es como un cuento al que le borraron todas las palabras y solo le dejaron la emoción: sabes cuándo viene la parte de miedo y cuándo la feliz, pero no de quién es la historia. Y los cuentos dicen «había una vez», hablan de algo que ya pasó; la música no puede decir «ayer» ni «hace mucho tiempo». Solo existe ahorita, mientras suena. Como nos deja la historia a medias, nos dan muchas ganas de completarla: oyes música de suspenso y tu cabeza inventa sola un monstruo detrás de la puerta. Esas ganas tienen nombre: impulso narrativo.", "a": "Para Nattiez la narración musical es una metáfora. La música se parece al relato en la forma de contar (el discurso) y nunca en lo que cuenta (la historia). Puede evocar espacio y tiempo, movimiento y afecto. El oyente completa con palabras lo que la música no dice. Adorno: «una narración que no cuenta nada».", "w": "Nattiez (1990) · Adorno", "e": "Vivaldi publicó sonetos junto a Las cuatro estaciones: la música sola no puede decir «un campesino borracho se queda dormido»."},
+  {"t": "El gesto", "g": "G", "s": "Cuando un perro mueve la cola no dice «estoy feliz», y aun así lo entiendes. Cuando alguien se cruza de brazos y frunce la cara, sabes que está bravo sin que hable. Eso es un gesto. Algunos autores dicen que la música está hecha de gestos: un sonido que sube puede parecer una pregunta, un golpe fuerte puede parecer un portazo. Pero un gesto solo se entiende según dónde aparece: un brazo levantado puede ser saludar o pedir la palabra en clase.", "a": "Cone ve la música instrumental como «puro gesto simbólico». El gesto tiene potencial expresivo, pero su significado depende del contexto. Kivy, citado por Maus: escuchamos un tema como un gesto antes de sentirlo expresivo.", "w": "Cone (1974) · Adorno · Kivy · Maus", "e": "Las dos notas de Tiburón: solas son dos notas; dentro de la película son una amenaza que se acerca."},
+  {"t": "Volver a casa", "g": "K", "s": "En las películas, a veces el personaje vuelve al lugar donde empezó todo, y ya no es el mismo. En la música pasa algo parecido: cuando regresa una melodía que ya oíste, sientes que la historia volvió a un lugar conocido.", "a": "Kramer distingue el tiempo gestual (el orden de la historia que imaginamos) del tiempo de la obra (el orden real de las notas). La repetición se vive como un regreso, en el discurso, a la misma parte de la historia.", "w": "Kramer (2003)", "e": "«El ciclo sin fin» abre El Rey León y vuelve al final, cuando presentan al cachorro de Simba en la Roca del Rey. Es la misma canción, pero después de toda la historia ya no la oímos igual."},
+  {"t": "Momentos de cuento", "g": "A", "s": "La música entera no es una historia, pero a veces aparece un momento especial en que sientes que alguien te está hablando, como cuando estás en un salón lleno de ruido y de pronto una voz se destaca y te llama la atención. Carolyn Abbate le dice a eso voz narrativa. También dice que la música está viva: un cuento escrito sigue en el libro aunque nadie lo lea, pero la música solo existe cuando alguien la toca y tú la oyes, con tu cuerpo, aquí y ahora. Por eso le importa más cómo se toca que lo que está escrito en el papel.", "a": "Para Abbate la música no es narración, pero tiene momentos narrativos. La voz narrativa se reconoce porque se desprende del continuo que la rodea. Lo que nos afecta es el acto de contar, en la interpretación. El clarinetista Martin Fröst: el gran momento es cuando aparece «la frágil voz humana».", "w": "Abbate (2002, 2004) · Fröst", "e": "En «Bohemian Rhapsody», después de la balada todo se corta y aparece la sección de ópera: sentimos que otra voz toma la palabra."},
+  {"t": "¿Quién cuenta la historia?", "g": "M", "s": "En un cuento siempre hay alguien que cuenta: el narrador. ¿Quién es el narrador en la música? Maus responde algo curioso: el narrador es como una sombra que pone el que escucha. Lo compara con el cine: en una película nadie aparece diciendo «ahora cambiamos de escena», pero sientes que alguien invisible decidió el orden de lo que ves. En la música pasa igual.", "a": "Para Maus el narrador musical es una proyección del oyente, como «la inteligencia invisible que guía el montaje de una película». Kramer dice que la «voz del compositor» (idea de Cone) es una especie de narrador fantasma.", "w": "Maus (1991, 2003) · Kramer · Cone", "e": "Al inicio de Up, casi sin diálogos, la música acompaña toda la vida de Carl y Ellie en unos minutos. Nadie narra, pero sentimos que alguien escogió y ordenó esos recuerdos."},
+  {"t": "Las historias de siempre", "g": "P", "s": "Casi todos los cuentos se parecen: el héroe sale de casa, tiene problemas, lucha y gana. Newcomb dice que la música también repite esas formas de historia: empieza triste, pelea y termina feliz, por ejemplo. No tiene personajes, pero tiene el camino.", "a": "Newcomb, siguiendo a Propp, habla de «arquetipos argumentales»: secuencias típicas de estados emocionales que una obra recorre. Treitler ve fragmentos de tema que actúan como «agentes dramáticos», y Maus explica que tendemos a darle a la música rasgos humanos.", "w": "Newcomb · Propp · Treitler · Maus", "e": "Las películas de superhéroes siguen ese camino con la música: el tema aparece a medias al inicio, se oscurece en la crisis y suena completo y a todo volumen en la victoria. La Quinta de Beethoven ya hacía ese recorrido, de do menor a do mayor."},
+  {"t": "La música habla de su época", "g": "C", "s": "Dos autores, McClary y Kramer, dicen que la música, sin darse cuenta, cuenta cómo pensaba la gente de su tiempo, igual que un dibujo de hace cien años muestra cómo se vestían. McClary lo estudia en una sinfonía de Brahms. Abbate no está muy de acuerdo con ellos y les dice algo así: «cuando uno está tocando o escuchando, no está pensando en eso, está sintiendo la música».", "a": "La Nueva Musicología lee la música como construcción cultural: género, poder, identidad. McClary analiza la Tercera Sinfonía de Brahms como un objeto que cuenta los valores de su momento histórico. Abbate critica que estas lecturas olviden el sonido presente.", "w": "McClary (2003) · Kramer (2003) · Abbate (2004)", "e": "Un himno nacional o una marcha militar: más allá de la letra, la música cuenta qué valores quería celebrar la sociedad que la hizo."},
+  {"t": "Puedes imaginar, pero no cualquier cosa", "g": "E", "s": "Si todos podemos inventar la historia de la música, ¿vale cualquier historia? Umberto Eco dice que no. Imagínate una música suave y lenta, como de canción de cuna: puedes imaginar un bebé durmiendo, la luna o un barquito en el mar. Pero si alguien dice «es una carrera de carros a toda velocidad», algo no cuadra. La misma música pone límites a lo que se puede imaginar.", "a": "Eco distingue la intención del autor, la del lector y la de la obra. Hay muchas interpretaciones posibles, pero la coherencia interna de la obra descarta las que no se sostienen. Rorty, más escéptico, duda que esa coherencia exista antes de interpretar.", "w": "Eco (1995) · Rorty", "e": "En Harry Potter, Hermione cree que Snape embruja la escoba, pero suena el tema de Voldemort: la música descarta esa lectura antes que la película."},
+  {"t": "El final del cuento", "g": "♪", "s": "La música se parece a los cuentos porque pasa en el tiempo: tiene un principio, un medio y un final, y no se puede devolver. Por eso es tan fácil compararla con una historia. Pero al final, la música es como un fantasma que no se ve pero se siente: te toca, te mueve, te emociona, y luego se va. Lo que queda es el recuerdo. Y la conclusión de Moliné, que es música, es sencilla: después de leer a todos estos autores tan complicados, lo importante es volver a tocar.", "a": "La temporalidad de la música, que transcurre y no se devuelve, es lo que alimenta la analogía con el relato. Moliné la describe como «una presencia invisible, pero sonora», que nos toca como fuerza física. Y como intérprete, después de la teoría, vuelve a la música.", "w": "Moliné (2020) · Chion · Bloom", "e": "La tormenta del inicio ya pasó y no se puede repetir igual, pero todos la recordamos."}
+];
+
+const CONCEPTS = [
+  { id:"b1-estructura", n:"B1", t:"Estructura, repetición y variación", short:"Estructura",
+    s:"La estructura son los capítulos de la música. Repetir hace que reconozcas algo. Variar hace que sientas que algo cambió, o sea, que pasó algo.",
+    p:"La forma organiza la obra en partes (A-B-A, estrofa y estribillo, forma sonata). La variación transforma un material ya conocido.",
+    m:"Kramer: la repetición se vive como un regreso a la misma parte de la historia.",
+    game:"seq",
+    ex:[
+      {v:"QI2IlA3ztIo", s:0, f:"Escena «The Grid» · 30–60 s bastan", ic:"city", t:"Koyaanisqatsi", y:1982, a:"Godfrey Reggio · música de Philip Glass", w:"Patrones cortos que se repiten y cambian muy poco a poco organizan el montaje de una película sin diálogos.", q:"Koyaanisqatsi Philip Glass", cls:1},
+      {v:"2LyEpA4B9_o", s:158, f:"2:38 – 4:25", ic:"blackhole", t:"Interstellar", y:2014, a:"Hans Zimmer · análisis de Jaime Altozano", w:"El tema de Cooper suena siempre dos veces, en mayor y en menor: el héroe y el padre. Variación pura.", q:""},
+      {v:"zhl-Cs1-sG4", s:0, f:"Audio oficial de Daft Punk", ic:"synth", t:"Giorgio by Moroder", y:2013, a:"Daft Punk", w:"Sobre un patrón que se repite entran instrumentos uno tras otro mientras Moroder cuenta su vida. Cruce con la semana 12.", q:"Daft Punk Giorgio by Moroder"},
+      {v:"s_pSJOkmYBA", s:0, f:"BBC Proms 2014 · basta con saltar entre minutos", ic:"drum", t:"Boléro", y:1928, a:"Maurice Ravel", w:"La misma melodía durante unos quince minutos: el relato es la acumulación.", q:"Ravel Boléro orchestra"},
+      {v:"c56t7upa8Bk", s:0, f:"Audio oficial (WaterTower Music)", ic:"top", t:"Time (El origen)", y:2010, a:"Hans Zimmer", w:"Unos pocos acordes que se repiten y se van cargando de instrumentos.", q:"Hans Zimmer Time Inception official"},
+      {v:"55hk75OgWDg", s:0, f:"Aria · Lang Lang", ic:"keys", t:"Variaciones Goldberg", y:1741, a:"J. S. Bach", w:"El aria del inicio vuelve idéntica al final y ya no suena igual después del recorrido.", q:"Bach Goldberg Variations aria"},
+      {v:"3WZP7-41iAU", s:0, f:"4.º movimiento · DW Classical Music", ic:"notes", t:"Quinta Sinfonía", y:1808, a:"L. van Beethoven", w:"De do menor a do mayor: el arquetipo de la lucha a la victoria.", q:"Beethoven Symphony 5 finale"}
+    ]},
+  { id:"b2-leitmotiv", n:"B2", t:"Leitmotiv", short:"Leitmotiv",
+    s:"Una melodía que es la firma de un personaje. Suena y sabes que está cerca, aunque todavía no lo veas.",
+    p:"Del alemán, «motivo conductor»: un motivo corto asociado a un personaje, objeto, lugar o idea, que reaparece y se transforma con el drama. Se asocia a Wagner, aunque el término lo popularizaron sus comentaristas.",
+    m:"Treitler lo llamaría un «agente dramático»: un fragmento de tema que actúa como personaje.",
+    game:"who",
+    ex:[
+      {v:"jXnLXLQ47ZY", s:36, f:"0:36 – 1:22 (definición, Vader en Cloud City, el niño Anakin)", ic:"filmnote", t:"Leitmotifs", y:2021, a:"Jaime Altozano", w:"«Cuando la banda sonora revela la trama»: el tema de Vader suena antes de que aparezca.", q:"", cls:1},
+      {v:"hxca7znSXgk", s:93, f:"1:33 – 2:16", ic:"broom", t:"Harry Potter", y:2001, a:"John Williams · análisis de Jaime Altozano", w:"Hermione cree que es Snape quien embruja la escoba, pero suena el tema de Voldemort: un spoiler musical.", q:""},
+      {v:"jXnLXLQ47ZY", s:123, f:"2:03 – 2:39", ic:"citymoon", t:"Batman: dos notas", y:2005, a:"Hans Zimmer · explicado por Jaime Altozano", w:"Un tema de dos notas para un Bruce Wayne atascado en su trauma.", q:""},
+      {v:"vsMWVW4xtwI", s:0, f:"Primeros 30 s · Filarmónica de Viena, dirige John Williams", ic:"stars", t:"Marcha Imperial", y:1980, a:"John Williams · Star Wars", w:"Darth Vader llega a la escena antes que su imagen.", q:"Imperial March John Williams official"},
+      {v:"BePfzCOMRZQ", s:0, f:"Tema principal · canal oficial de John Williams", ic:"fin", t:"Tiburón", y:1975, a:"John Williams", w:"Dos notas bastan para saber que el tiburón está cerca, aunque no se vea.", q:"Jaws theme John Williams"},
+      {v:"QJHPlKPOc78", s:0, f:"Audio oficial (Sony Soundtracks)", ic:"window", t:"Light of the Seven", y:2016, a:"Ramin Djawadi · Juego de Tronos", w:"Piano y órgano, raros en la serie, anuncian una tragedia.", q:"Light of the Seven Ramin Djawadi official"},
+      {v:"XNCQZ0wxphY", s:0, f:"Audio oficial (Marvel Music)", ic:"team", t:"The Avengers", y:2012, a:"Alan Silvestri", w:"El tema del equipo reaparece cada vez que se reúnen.", q:"Avengers theme Alan Silvestri"}
+    ]},
+  { id:"b3-llamada", n:"B3", t:"Llamada y respuesta", short:"Llamada y respuesta",
+    s:"Una conversación musical: uno pregunta, otro contesta.",
+    p:"Una voz o un grupo propone una frase y otro le responde. Está en el canto litúrgico (solista y comunidad, o dos coros que se alternan), en los coros enfrentados de Gabrieli en Venecia y en las tradiciones africanas que llegaron al gospel, el jazz y la salsa.",
+    m:"Es la forma más literal del diálogo, aunque no haya palabras.",
+    game:"call",
+    ex:[
+      {v:"S4PYI6TzqYk", s:0, f:"Clip oficial (Movieclips) · 2:41", ic:"ufo", t:"Encuentros cercanos del tercer tipo", y:1977, a:"Steven Spielberg · música de John Williams", w:"Humanos y extraterrestres conversan con una frase de cinco notas que va y vuelve.", q:"Close Encounters of the Third Kind five tones scene", cls:1},
+      {v:"WBiL0VEttZw", s:0, f:"hr-Sinfonieorchester", ic:"trumpet", t:"The Unanswered Question", y:1906, a:"Charles Ives", w:"Una trompeta pregunta, las flautas intentan responder y nadie contesta del todo.", q:"Ives The Unanswered Question"},
+      {v:"pDlZLsJJkVA", s:0, f:"Escena de la película", ic:"banjo", t:"Dueling Banjos", y:1972, a:"Amarga pesadilla (Deliverance)", w:"Una guitarra y un banjo se responden en un duelo que crece.", q:"Dueling Banjos Deliverance scene"},
+      {v:"-nINCKCa9Mg", s:0, f:"Fragmento de 43 s", ic:"mic", t:"Live Aid: «Ay-oh»", y:1985, a:"Freddie Mercury y Queen", w:"Un estadio entero responde a cada frase del cantante.", q:"Freddie Mercury Ay-Oh Live Aid"},
+      {v:"HJbbuTV5Q_I", s:0, f:"Teatro La Fenice, Venecia", ic:"dome", t:"Sonata pian' e forte", y:1597, a:"Giovanni Gabrieli", w:"Dos grupos de instrumentos se contestan desde lados distintos de la basílica.", q:"Gabrieli Sonata pian e forte"}
+    ]},
+  { id:"b4-coro", n:"B4", t:"Coro", short:"Coro",
+    s:"Muchas voces que hablan como una sola: el pueblo, la multitud, la comunidad.",
+    p:"Tiene dos sentidos. Un grupo que canta junto, heredero del coro de la tragedia griega, que representaba a la comunidad y comentaba la acción. Y, en la canción, el estribillo: la parte que se repite.",
+    m:"El coro es una voz narrativa colectiva: comenta, juzga o empuja la historia.",
+    game:"choir",
+    ex:[
+      {v:"8X2JH46Q4FQ", s:0, f:"Clip oficial de Disney México, en español", ic:"columns", t:"Hércules: las Musas", y:1997, a:"Disney · Alan Menken", w:"Un coro griego literal, en clave gospel, que narra la película.", q:"Hercules The Gospel Truth Muses", cls:1},
+      {v:"LtwbyjM0N7U", s:182, f:"3:02 – 4:19", ic:"voices", t:"¿Qué es una voz?", y:2021, a:"Jaime Altozano · «Una (muy) breve introducción a la música clásica»", w:"Una pieza de Bach a tres voces: cada voz se colorea y luego suena con un instrumento distinto.", q:""},
+      {v:"EJC-_j3SnXk", s:0, f:"André Rieu", ic:"wheel", t:"O Fortuna", y:1937, a:"Carl Orff · Carmina Burana", w:"La voz de la fortuna, usada en cientos de tráileres.", q:"Carl Orff O Fortuna"},
+      {v:"4x3lJuUzWs0", s:0, f:"Coro de la turba: «Lass ihn kreuzigen»", ic:"crowd", t:"Pasión según San Mateo", y:1727, a:"J. S. Bach", w:"El coro hace de turba y, en los corales, se detiene a comentar.", q:"Bach St Matthew Passion Lass ihn kreuzigen"},
+      {v:"D_2bluVPsb0", s:0, f:"Canal oficial de John Williams", ic:"swords", t:"Duel of the Fates", y:1999, a:"John Williams · Star Wars", w:"Un coro que vuelve épico un duelo.", q:"Duel of the Fates John Williams"},
+      {v:"5qYjzNv-WoA", s:0, f:"«El ciclo sin fin», versión oficial en español", ic:"sunrise", t:"Circle of Life", y:1994, a:"El Rey León · Lebo M, Elton John, Hans Zimmer", w:"La voz de toda la sabana en el amanecer.", q:"Circle of Life Lion King opening"}
+    ]},
+  { id:"b5-opera", n:"B5", t:"Ópera", short:"Ópera",
+    s:"Teatro cantado, donde la música dice lo que los personajes sienten.",
+    p:"Drama cantado con orquesta, nacido en Italia hacia 1600. Recitativo: casi hablado, avanza la acción. Aria: el tiempo se detiene y el personaje expresa lo que siente. Número de conjunto: varios personajes cantan a la vez, cada uno con su punto de vista.",
+    m:"Si cuatro actores hablan a la vez no se entiende nada; si cantan, sí. Ese es un poder narrativo propio de la música.",
+    game:"opera",
+    ex:[
+      {v:"wTi8yLyHeb8", s:150, f:"Parte final superpuesta: desde ≈2:30 (verificar)", ic:"house", t:"No se habla de Bruno", y:2021, a:"Encanto · Lin-Manuel Miranda", w:"Al final todos cantan su versión a la vez: un número de conjunto.", q:"We Don't Talk About Bruno Encanto official", cls:1},
+      {v:"wOpT9nTtGzc", s:0, f:"Cuarteto completo", ic:"jester", t:"Cuarteto de Rigoletto", y:1851, a:"Giuseppe Verdi", w:"Cuatro personajes, cuatro emociones distintas, al mismo tiempo.", q:"Rigoletto Bella figlia dell amore quartet"},
+      {v:"Sv-BxH3SVS8", s:0, f:"Película de 2012 · clip oficial (Movieclips)", ic:"flag", t:"One Day More", y:1985, a:"Los Miserables · Claude-Michel Schönberg", w:"Todos los personajes del musical se cruzan en una sola canción.", q:"One Day More Les Miserables"},
+      {v:"Mr8ICnGutYM", s:554, f:"9:14 – 9:40", ic:"chase", t:"La fuga: voces que se persiguen", y:2017, a:"Jaime Altozano · «De Pokémon a Bach. Una historia de voces»", w:"Una voz presenta el tema y las otras la persiguen repitiéndolo, como en el canon de Martinillo del juego.", q:""},
+      {v:"YuBeBjqKSGQ", s:0, f:"Royal Opera House", ic:"moonstar", t:"Aria de la Reina de la Noche", y:1791, a:"W. A. Mozart · La flauta mágica", w:"Un aria: la acción se detiene y estalla la furia del personaje.", q:"Queen of the Night aria Mozart"},
+      {v:"Td48T0FKZb8", s:0, f:"«Cinque, dieci, venti» · Garsington Opera", ic:"ruler", t:"Las bodas de Fígaro", y:1786, a:"W. A. Mozart", w:"El primer número: Fígaro mide el cuarto y Susanna se prueba un sombrero. Dos personajes, dos preocupaciones, cantando a la vez.", q:"Marriage of Figaro recitative aria"}
+    ]},
+  { id:"b6-copla", n:"B6", t:"Copla y canción como relato", short:"Copla",
+    s:"Una canción que cuenta una historia estrofa por estrofa, con la misma melodía cada vez.",
+    p:"La copla es una estrofa breve, casi siempre de cuatro versos, que sirve de letra a canciones populares. La melodía se repite y el texto avanza: es una canción estrófica. Lo contrario es la canción compuesta de principio a fin, donde la música cambia con la historia.",
+    m:"Repetición musical al servicio de una historia que sí cambia.",
+    game:"copla",
+    ex:[
+      {v:"es25d2xf820", s:0, f:"Canti Rondas", ic:"hat", t:"Mambrú se fue a la guerra", y:"s. XVIII", a:"Tradicional", w:"Una historia completa (la guerra, la espera, la noticia) con la misma melodía en cada estrofa.", q:"Mambrú se fue a la guerra canción", cls:1},
+      {v:"JS91p-vmSf0", s:0, f:"Oxford Lieder", ic:"horse", t:"Erlkönig", y:1815, a:"Franz Schubert · poema de Goethe", w:"Un cantante para cuatro personajes; el piano es el caballo. La música cambia con la historia.", q:"Schubert Erlkönig"},
+      {v:"8e0owGvMsY8", s:0, f:"Grabación de Conchita Piquer", ic:"anchor", t:"Tatuaje", y:1941, a:"Quintero, León y Quiroga · Concha Piquer", w:"Una copla española que es un pequeño drama completo.", q:"Tatuaje Concha Piquer"},
+      {v:"OwGG5fX7bxY", s:0, f:"Canal oficial de Mecano", ic:"moon", t:"Hijo de la Luna", y:1986, a:"Mecano", w:"Una leyenda contada estrofa por estrofa. Cruce con la semana 12.", q:"Hijo de la Luna Mecano"},
+      {v:"LbBLA7uvM3c", s:0, f:"Grabación original", ic:"lamp", t:"Pedro Navaja", y:1978, a:"Rubén Blades y Willie Colón", w:"Crónica con narrador, personajes y giro final. Cruce con la semana 12.", q:"Pedro Navaja Ruben Blades"}
+    ]},
+  { id:"b7-atmosfera", n:"B7", t:"Canción como atmósfera", short:"Atmósfera",
+    s:"Música que no te cuenta qué pasó, sino cómo se siente estar ahí.",
+    p:"En la ópera, el aria es atmósfera y el recitativo es relato. En el cine, la música de fondo crea un mundo y un estado de ánimo sin narrar hechos.",
+    m:"Casi todo se repite y casi nada cambia: por eso se siente como un estado y no como un hecho.",
+    game:"mix",
+    ex:[
+      {v:"YwqcsYLCGyI", s:176, f:"2:56 – 3:41 (los aldeanos se duermen). Relato: 1:17 – 2:08", ic:"leaf", t:"Otoño", y:1725, a:"Antonio Vivaldi · análisis de Jaime Altozano", w:"La fiesta de los campesinos es relato; el pasaje en que se duermen es atmósfera.", q:"Jaime Altozano Cuatro Estaciones Vivaldi granjero borracho", cls:1},
+      {v:"4wTD-jwmz5s", s:0, f:"Escena final", ic:"fountain", t:"Clair de lune", y:1905, a:"Claude Debussy · en Ocean's Eleven", w:"Los personajes miran las fuentes en silencio mientras suena.", q:"Ocean's Eleven Clair de Lune fountain scene"},
+      {v:"xIQrC4CerB8", s:0, f:"Canal oficial de C418", ic:"cube", t:"Sweden", y:2011, a:"C418 · Minecraft", w:"Atmósfera pura, sin historia explícita, que una generación tiene grabada.", q:"C418 Sweden Minecraft"},
+      {v:"pze4NxCOjg0", s:0, f:"Canción completa", ic:"snow", t:"Der Leiermann", y:1827, a:"Franz Schubert · Viaje de invierno", w:"Un músico pobre toca en el frío; el piano repite el mismo bordón.", q:"Schubert Der Leiermann"},
+      {v:"BdtiYwSP9ko", s:0, f:"«Paul's Dream» · audio oficial", ic:"dunes", t:"Dune", y:2021, a:"Hans Zimmer", w:"El desierto convertido en sonido.", q:"Hans Zimmer Dune Paul's Dream"}
+    ]},
+  { id:"b8-improvisacion", n:"B8", t:"Improvisación", short:"Improvisación",
+    s:"Inventar la música mientras la tocas, como contar un cuento sin guion.",
+    p:"Crear en el momento de la interpretación. Bach improvisó una fuga sobre un tema que le dio Federico el Grande (1747); los solistas improvisaban las cadenzas. En el cine mudo, los pianistas de sala improvisaban mientras veían la película.",
+    m:"Abbate: importa el acto de contar, más que la partitura.",
+    game:"improv",
+    ex:[
+      {v:"y123H5VAfpA", s:0, f:"Video corto en español (revisar antes)", ic:"projector", t:"Pianistas del cine mudo", y:"1900–1929", a:"Acompañamiento en vivo", w:"La música se inventaba frente a la pantalla, función por función.", q:"silent film live piano accompaniment improvisation", cls:1},
+      {v:"V_2eNgkWGns", s:0, f:"Banda sonora oficial (Milan Records)", ic:"sticks", t:"Birdman", y:2014, a:"Antonio Sánchez", w:"Una banda sonora casi solo de batería, improvisada mirando las escenas.", q:"Birdman drums Antonio Sánchez"},
+      {v:"Pd_Kti6jvy8", s:0, f:"Parte I · canal oficial de Keith Jarrett", ic:"piano", t:"The Köln Concert", y:1975, a:"Keith Jarrett", w:"Un concierto de piano improvisado de principio a fin.", q:"Keith Jarrett Koln Concert"},
+      {v:"ne6tB2KiZuk", s:0, f:"Video oficial del World Science Festival · 3:04", ic:"penta", t:"La escala pentatónica", y:2009, a:"Bobby McFerrin · World Science Festival", w:"El público improvisa sin ensayo, igual que en el juego de esta pista.", q:"Bobby McFerrin pentatonic scale World Science Festival"},
+      {v:"Lv5A1gy2oys", s:0, f:"Ricercar a 3 · Netherlands Bach Society", ic:"crown", t:"Ofrenda musical", y:1747, a:"J. S. Bach", w:"Nació de una improvisación frente al rey de Prusia.", q:"Bach Musical Offering Ricercar a 3"}
+    ]}
+];
+
+
+const ICONS = {
+ city:'<path d="M4 42h40M8 42V22h8v20M18 42V12h10v30M30 42V26h10v16"/><path d="M2 34h12M24 30h20M6 38h36" stroke-dasharray="2 3"/>',
+ blackhole:'<circle cx="24" cy="24" r="7" fill="currentColor"/><ellipse cx="24" cy="24" rx="20" ry="6"/><path d="M10 14a16 16 0 0 1 28 0"/>',
+ synth:'<rect x="4" y="16" width="40" height="22" rx="2"/><path d="M8 30v8M14 30v8M20 30v8M26 30v8M32 30v8M38 30v8"/><circle cx="12" cy="22" r="2"/><circle cx="20" cy="22" r="2"/><path d="M28 22h12"/>',
+ drum:'<ellipse cx="24" cy="16" rx="16" ry="5"/><path d="M8 16v16c0 3 7 6 16 6s16-3 16-6V16M12 20l6 16M36 20l-6 16M30 4l-8 10M40 6l-12 9"/>',
+ top:'<path d="M24 6v6M12 18h24l-12 24z"/><path d="M12 18c4-4 20-4 24 0"/>',
+ keys:'<rect x="4" y="12" width="40" height="26" rx="2"/><path d="M10 12v26M16 12v26M22 12v26M28 12v26M34 12v26M40 12v26"/><path d="M13 12v14M19 12v14M31 12v14M37 12v14" stroke-width="4"/>',
+ notes:'<path d="M14 36V12l24-6v24"/><circle cx="10" cy="36" r="4" fill="currentColor"/><circle cx="34" cy="30" r="4" fill="currentColor"/><path d="M14 18l24-6"/>',
+ filmnote:'<rect x="4" y="10" width="40" height="28" rx="2"/><path d="M4 16h40M4 32h40M10 10v6M18 10v6M26 10v6M34 10v6M10 32v6M18 32v6M26 32v6M34 32v6"/><path d="M26 19v8"/><circle cx="23" cy="27" r="3" fill="currentColor"/>',
+ broom:'<path d="M38 6L20 28"/><path d="M20 28l-6 2-8 12 12-8 2-6z"/><path d="M12 36l-4 6M16 38l-2 4"/>',
+ moon:'<path d="M32 6a16 16 0 1 0 10 26A13 13 0 0 1 32 6z"/>',
+ citymoon:'<path d="M30 6a10 10 0 1 0 8 16 8 8 0 0 1-8-16z"/><path d="M4 42h40M6 42V28h6v14M14 42V20h8v22M24 42V30h6v12M32 42V24h8v18"/>',
+ stars:'<path d="M14 8l2 6 6 0-5 4 2 6-5-4-5 4 2-6-5-4h6zM34 22l1.5 4 4 .2-3 2.6 1 4-3.5-2.3-3.5 2.3 1-4-3-2.6 4-.2z"/><path d="M6 40l36-8" />',
+ fin:'<path d="M4 36c6-3 10 3 16 0s10 3 16 0 6-1 8 0"/><path d="M4 42c6-3 10 3 16 0s10 3 16 0 6-1 8 0"/><path d="M16 34c2-12 8-20 18-24-4 8-6 16-4 24"/>',
+ window:'<path d="M12 42V20a12 12 0 0 1 24 0v22z"/><circle cx="24" cy="20" r="6"/><path d="M12 30h24M24 26v16"/>',
+ team:'<circle cx="12" cy="16" r="4"/><circle cx="24" cy="12" r="4"/><circle cx="36" cy="16" r="4"/><path d="M4 36c0-6 4-10 8-10s8 4 8 10M16 32c0-7 4-12 8-12s8 5 8 12M28 36c0-6 4-10 8-10s8 4 8 10"/>',
+ ufo:'<ellipse cx="24" cy="22" rx="20" ry="6"/><path d="M14 18a10 7 0 0 1 20 0"/><circle cx="12" cy="22" r="1.5" fill="currentColor"/><circle cx="24" cy="24" r="1.5" fill="currentColor"/><circle cx="36" cy="22" r="1.5" fill="currentColor"/><path d="M18 30l-4 12M30 30l4 12" stroke-dasharray="2 3"/>',
+ trumpet:'<path d="M4 26h22l12-8v20l-12-8H4z"/><path d="M12 26v-6M17 26v-6M22 26v-6"/><path d="M40 6a4 4 0 1 1 3 6c-2 1-3 2-3 4M40 20v1"/>',
+ banjo:'<circle cx="16" cy="32" r="10"/><circle cx="16" cy="32" r="4"/><path d="M22 26L42 6M38 4l6 6"/>',
+ mic:'<rect x="18" y="4" width="12" height="20" rx="6"/><path d="M12 20a12 12 0 0 0 24 0M24 32v10M16 42h16"/>',
+ dome:'<path d="M8 42V26h32v16M10 26a14 14 0 0 1 28 0M24 8v4M6 42h36M16 42V32h4v10M28 42V32h4v10"/>',
+ columns:'<path d="M6 12h36L24 4zM6 12v2h36v-2M10 16v22M18 16v22M30 16v22M38 16v22M6 38h36v4H6z"/>',
+ voices:'<path d="M4 14c6-6 10 6 16 0s10 6 16 0 6-2 8 0"/><path d="M4 24c6-6 10 6 16 0s10 6 16 0 6-2 8 0" stroke-dasharray="1 0"/><path d="M4 34c6-6 10 6 16 0s10 6 16 0 6-2 8 0"/>',
+ wheel:'<circle cx="24" cy="24" r="18"/><circle cx="24" cy="24" r="4"/><path d="M24 6v36M6 24h36M11 11l26 26M37 11L11 37"/>',
+ crowd:'<circle cx="10" cy="28" r="3"/><circle cx="20" cy="26" r="3"/><circle cx="30" cy="26" r="3"/><circle cx="40" cy="28" r="3"/><path d="M10 22V8M20 20V6M30 20V6M40 22V8M4 44c0-6 3-10 6-10s6 4 6 10M14 44c0-7 3-12 6-12s6 5 6 12M24 44c0-7 3-12 6-12s6 5 6 12M34 44c0-6 3-10 6-10s6 4 6 10"/>',
+ swords:'<path d="M8 8l26 26M40 8L14 34M30 38l8-8M10 30l8 8M34 34l6 6M14 34l-6 6"/>',
+ sunrise:'<path d="M4 38h40M14 38a10 10 0 0 1 20 0M24 16v-6M10 24l-4-4M38 24l4-4"/><path d="M28 38l6-10 10 10" fill="currentColor"/>',
+ house:'<path d="M6 22L24 8l18 14M10 20v22h28V20"/><rect x="15" y="26" width="6" height="6"/><rect x="27" y="26" width="6" height="6"/><path d="M21 42v-6h6v6"/><path d="M38 10l2-3 2 3-2 3z"/>',
+ jester:'<path d="M8 30c2-12 8-18 16-18s14 6 16 18"/><path d="M8 30l-2-14M40 30l2-14M24 12V4"/><circle cx="6" cy="14" r="2.5"/><circle cx="42" cy="14" r="2.5"/><circle cx="24" cy="4" r="2.5"/><path d="M8 30h32v6H8z"/>',
+ flag:'<path d="M10 44V4"/><path d="M10 6c8-4 14 4 22 0s8 0 10 0v18c-2 0-4-4-10 0s-14-4-22 0"/>',
+ chase:'<path d="M4 14h26l-6-6M30 14l-6 6M8 26h26l-6-6M34 26l-6 6M12 38h26l-6-6M38 38l-6 6"/>',
+ moonstar:'<path d="M28 6a14 14 0 1 0 10 22 11 11 0 0 1-10-22z"/><path d="M40 8l1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/>',
+ ruler:'<rect x="4" y="18" width="40" height="12" rx="1"/><path d="M10 18v5M16 18v7M22 18v5M28 18v7M34 18v5M40 18v7"/>',
+ hat:'<path d="M4 32c6-2 10-14 20-14s14 12 20 14c-6 4-34 4-40 0z"/><path d="M24 18V8l8 4-8 3"/>',
+ horse:'<path d="M14 42l2-14c-4-2-6-8-2-14l6-6 4 4 10 2c4 2 6 6 4 8l-6-2-4 6 4 16"/><circle cx="26" cy="14" r="1.2" fill="currentColor"/>',
+ anchor:'<circle cx="24" cy="8" r="4"/><path d="M24 12v30M14 20h20M8 30c0 8 8 12 16 12s16-4 16-12M8 30l-3 3M40 30l3 3"/>',
+ lamp:'<path d="M24 44V12M18 12h12l-2-6h-8zM16 44h16M20 18l-8 10M28 18l8 10" /><path d="M12 28l4 2M36 28l-4 2" stroke-dasharray="2 2"/>',
+ leaf:'<path d="M8 40C8 18 22 8 42 6c-2 20-12 34-34 34z"/><path d="M8 40L32 16M18 30h8M24 24h6"/>',
+ fountain:'<path d="M8 42h32M10 42c0-6 6-8 14-8s14 2 14 8M24 34V18M24 18c-4-6-10-6-14-2M24 18c4-6 10-6 14-2M24 18V8"/><path d="M10 22v2M38 22v2" stroke-dasharray="2 3"/>',
+ cube:'<path d="M24 4l18 10v20L24 44 6 34V14z"/><path d="M6 14l18 10 18-10M24 24v20"/><path d="M15 19v10M33 19v10" stroke-dasharray="2 2"/>',
+ snow:'<path d="M24 4v40M7 14l34 20M41 14L7 34M20 8l4 4 4-4M20 40l4-4 4 4"/>',
+ dunes:'<circle cx="34" cy="12" r="5"/><path d="M2 36c8-10 16-10 22-4s12 4 22-6M2 44c10-8 20-8 28-2s10 2 16-2"/>',
+ projector:'<circle cx="14" cy="12" r="7"/><circle cx="30" cy="12" r="7"/><rect x="8" y="22" width="26" height="14" rx="2"/><path d="M34 26l10-6v18l-10-6"/><path d="M14 36l-4 8M28 36l4 8"/>',
+ sticks:'<path d="M6 42L30 8M16 44L40 12"/><circle cx="30" cy="8" r="2" fill="currentColor"/><circle cx="40" cy="12" r="2" fill="currentColor"/><path d="M4 30h10M34 36h10" stroke-dasharray="2 3"/>',
+ piano:'<path d="M6 40V18c0-6 4-10 10-10h8c4 0 6 3 8 6l10 10v16z"/><path d="M6 32h36M12 32v8M18 32v8M24 32v8M30 32v8M36 32v8"/>',
+ penta:'<circle cx="8" cy="34" r="3"/><circle cx="16" cy="28" r="3"/><circle cx="24" cy="22" r="3"/><circle cx="32" cy="16" r="3"/><circle cx="40" cy="10" r="3"/><path d="M4 42h40" stroke-dasharray="3 3"/>',
+ crown:'<path d="M6 36l-2-22 10 8 10-14 10 14 10-8-2 22z"/><path d="M6 42h36"/>'
+};
+
+/* =========================================================
+   AUDIO
+   ========================================================= */
+let ctx = null, master = null, analyser = null, soundOn = true, noiseBuf = null;
+function ac(){
+  if(!ctx){
+    const C = window.AudioContext || window.webkitAudioContext; if(!C) return null;
+    ctx = new C();
+    master = ctx.createGain(); master.gain.value = soundOn ? .8 : 0;
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
+    analyser = ctx.createAnalyser(); analyser.fftSize = 256;
+    master.connect(comp); comp.connect(analyser); analyser.connect(ctx.destination);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+  }
+  if(ctx.state === "suspended") ctx.resume();
+  return ctx;
+}
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function env(g, t, a, peak, dur, rel){
+  g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + a);
+  g.gain.setValueAtTime(peak, t + Math.max(a, dur - rel));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+}
+function noiseSrc(){ const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; return s; }
+function vibrato(osc, t, dur, rate, depth){
+  const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = rate; lg.gain.value = depth;
+  l.connect(lg).connect(osc.frequency); l.start(t); l.stop(t + dur + .05);
+}
+// instrumentos sintetizados (aproximaciones, no grabaciones)
+function play(inst, midi, t, dur = .5, vel = 1, dest){
+  const c = ac(); if(!c) return; t = t ?? c.currentTime; dest = dest || master;
+  const f = mtof(midi), g = c.createGain(); g.connect(dest);
+  const o = c.createOscillator();
+  if(inst === "trombon"){
+    o.type = "sawtooth"; o.frequency.value = f;
+    const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.Q.value = 2;
+    lp.frequency.setValueAtTime(300, t); lp.frequency.linearRampToValueAtTime(1500, t + .12); lp.frequency.linearRampToValueAtTime(900, t + dur);
+    o.connect(lp).connect(g); env(g, t, .06, .32*vel, dur, .12); vibrato(o, t, dur, 4.5, 2);
+  } else if(inst === "violin"){
+    o.type = "sawtooth"; o.frequency.value = f;
+    const bp = c.createBiquadFilter(); bp.type = "peaking"; bp.frequency.value = 2400; bp.gain.value = 8;
+    const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 4200;
+    o.connect(bp).connect(lp).connect(g); env(g, t, .09, .2*vel, dur, .15); vibrato(o, t, dur, 5.8, f*.012);
+  } else if(inst === "flauta"){
+    o.type = "sine"; o.frequency.value = f;
+    const o2 = c.createOscillator(); o2.type = "triangle"; o2.frequency.value = f*2; const g2 = c.createGain(); g2.gain.value = .08; o2.connect(g2).connect(g);
+    const n = noiseSrc(), nb = c.createBiquadFilter(), ng = c.createGain(); nb.type = "bandpass"; nb.frequency.value = f*2; nb.Q.value = 3; ng.gain.value = .05;
+    n.connect(nb).connect(ng).connect(g); n.start(t); n.stop(t + dur + .05);
+    o.connect(g); env(g, t, .07, .34*vel, dur, .12); vibrato(o, t, dur, 5, f*.008); o2.start(t); o2.stop(t + dur + .05);
+  } else if(inst === "timbal"){
+    o.type = "sine"; o.frequency.setValueAtTime(f*1.6, t); o.frequency.exponentialRampToValueAtTime(f, t + .06);
+    o.connect(g); env(g, t, .004, .7*vel, Math.max(dur, .9), .8);
+    const n = noiseSrc(), lp = c.createBiquadFilter(), ng = c.createGain(); lp.type = "lowpass"; lp.frequency.value = 500;
+    n.connect(lp).connect(ng).connect(dest); env(ng, t, .002, .4*vel, .25, .2); n.start(t); n.stop(t + .3);
+    dur = Math.max(dur, .9);
+  } else if(inst === "piano"){
+    o.type = "triangle"; o.frequency.value = f;
+    const o2 = c.createOscillator(); o2.type = "sine"; o2.frequency.value = f*2; const g2 = c.createGain(); g2.gain.value = .25; o2.connect(g2).connect(g); o2.start(t); o2.stop(t + dur + 1.2);
+    o.connect(g); g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(.35*vel, t + .006); g.gain.exponentialRampToValueAtTime(.0001, t + dur + 1.1);
+    dur = dur + 1.1;
+  } else if(inst === "bajo"){
+    o.type = "square"; o.frequency.value = f;
+    const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420;
+    o.connect(lp).connect(g); env(g, t, .01, .3*vel, dur, .08);
+  } else if(inst === "voz"){
+    o.type = "sawtooth"; o.frequency.value = f;
+    const f1 = c.createBiquadFilter(), f2 = c.createBiquadFilter(), mix = c.createGain();
+    f1.type = "bandpass"; f1.frequency.value = 750; f1.Q.value = 6; f2.type = "bandpass"; f2.frequency.value = 1150; f2.Q.value = 8;
+    o.connect(f1).connect(mix); o.connect(f2).connect(mix); mix.gain.value = 2.2; mix.connect(g);
+    env(g, t, .08, .5*vel, dur, .15); vibrato(o, t, dur, 5.4, f*.01);
+  } else if(inst === "campana"){
+    o.type = "sine"; o.frequency.value = f;
+    const o2 = c.createOscillator(); o2.type = "sine"; o2.frequency.value = f*2.76; const g2 = c.createGain(); g2.gain.value = .3; o2.connect(g2).connect(g); o2.start(t); o2.stop(t + 3);
+    o.connect(g); g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(.22*vel, t + .005); g.gain.exponentialRampToValueAtTime(.0001, t + 2.8);
+    dur = 2.8;
+  } else if(inst === "bombo"){
+    o.type = "sine"; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(42, t + .14);
+    o.connect(g); g.gain.setValueAtTime(.9*vel, t); g.gain.exponentialRampToValueAtTime(.0001, t + .32); dur = .32;
+  } else if(inst === "palma"){
+    o.disconnect(); const n = noiseSrc(), bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1400; bp.Q.value = 1.2;
+    n.connect(bp).connect(g); [0, .012, .024].forEach(d => { g.gain.setValueAtTime(.55*vel, t + d); g.gain.exponentialRampToValueAtTime(.05, t + d + .01); });
+    g.gain.exponentialRampToValueAtTime(.0001, t + .2); n.start(t); n.stop(t + .22); return;
+  } else if(inst === "hat"){
+    const n = noiseSrc(), hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 7000;
+    n.connect(hp).connect(g); g.gain.setValueAtTime(.18*vel, t); g.gain.exponentialRampToValueAtTime(.0001, t + .06); n.start(t); n.stop(t + .08); return;
+  }
+  o.start(t); o.stop(t + dur + .1);
+}
+function crackle(sec = 1.6){
+  const c = ac(); if(!c) return; const t = c.currentTime;
+  for(let i=0;i<60;i++){ const at = t + Math.random()*sec, n = noiseSrc(), g = c.createGain(), hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 2500;
+    n.connect(hp).connect(g).connect(master); g.gain.setValueAtTime(.12*Math.random(), at); g.gain.exponentialRampToValueAtTime(.0001, at + .01); n.start(at); n.stop(at + .02); }
+}
+
+/* =========================================================
+   UTILIDADES
+   ========================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const waveText = s => { let i = 0; return s.split(" ").map(w => `<span class="ww">${[...w].map(ch => `<span class="l" style="--i:${i++}">${esc(ch)}</span>`).join("")}</span>`).join(" "); };
+const store = { get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch(_) { return d; } }, set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(_) {} } };
+function hash(s){ let h = 2166136261; for(const ch of s){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function sleeveArt(t){
+  const h = hash(t), k = h % 4, r = n => ((h >>> n) & 255) / 255;
+  const pal = [["#151413","#e8e5de"],["#e9481f","#f3f1ec"],["#c9c4ba","#151413"],["#4b4843","#e8e5de"]][k];
+  const motif = (h >> 3) % 3;
+  let bg;
+  if(motif === 0) bg = `repeating-radial-gradient(circle at ${30 + r(5)*40}% ${30 + r(9)*40}%, ${pal[0]} 0 6px, ${pal[1]}22 6px 7px), ${pal[0]}`;
+  else if(motif === 1) bg = `repeating-linear-gradient(${Math.round(r(7)*180)}deg, ${pal[0]} 0 ${8 + Math.round(r(11)*10)}px, ${pal[1]}26 0 ${10 + Math.round(r(11)*10)}px), ${pal[0]}`;
+  else bg = `radial-gradient(circle at ${20 + r(4)*60}% ${20 + r(12)*50}%, ${pal[1]}55 0 18%, transparent 19%), radial-gradient(circle at ${60 + r(6)*30}% 70%, ${pal[1]}33 0 28%, transparent 29%), ${pal[0]}`;
+  return { bg, fg: pal[1] };
+}
+function setRange(el){ const v = (el.value - el.min) / (el.max - el.min) * 100; el.style.setProperty("--v", v + "%"); }
+
+/* =========================================================
+   ESCENAS
+   ========================================================= */
+const stage = $("#stage");
+const SCENES = [];
+function addScene(def){ SCENES.push(def); }
+
+/* --- 0. Portada --- */
+addScene({ id:"inicio", label:"Portada", side:"Intro", num:"00", cls:"cover",
+  html:`<div class="inner">
+    <div class="deck" id="deck">
+      <div class="plinth"></div>
+      <div class="platter"><div class="vinyl" id="vinyl"><div class="label"><span class="lt">Narrativa<br>en la<br>música</span><span class="lb">33⅓ · LADO A</span></div></div></div>
+      <div class="arm" id="arm" title="Bajar la aguja">
+        <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="30" fill="#d6d2c9" stroke="#151413" stroke-width="2"/><circle cx="50" cy="50" r="12" fill="#151413"/>
+        <path d="M50 50 L58 260 L40 330" fill="none" stroke="#151413" stroke-width="7" stroke-linecap="round"/><rect x="26" y="322" width="28" height="44" rx="4" transform="rotate(20 40 344)" fill="#e9481f" stroke="#151413" stroke-width="2"/></svg>
+      </div>
+      <span class="knob k1"></span><span class="knob k2"></span>
+      <div class="rpm"><i class="on">33</i><i>45</i><span>Lado A</span></div>
+    </div>
+    <div class="copy">
+      <div class="eyebrow"><b>●</b> Exposición</div>
+      <h1 class="big h1 wave">${waveText("Narrativa")}<br>${waveText("en la música")}</h1>
+      <p class="lede">Estructura, repetición y variación. Un recorrido en dos lados: la teoría (Moliné) y las herramientas con que la música cuenta historias.</p>
+      <button class="drop" id="drop" type="button"><span class="ring"></span>Bajar la aguja</button>
+      <div class="credits"><span>Narrativa I</span><span>Cine y Televisión · UNAL</span><span>2026</span></div>
+    </div>
+  </div>`,
+  enter(el){ el.classList.remove("zooming"); $("#arm").classList.remove("down"); $("#vinyl").classList.remove("spin"); setOnAir(false); dropped = false; },
+  step(dir){ if(dir > 0 && !dropped){ dropNeedle(); return true; } return false; }
+});
+let dropped = false;
+function dropNeedle(){
+  if(dropped) return; dropped = true;
+  const el = SCENES[0].el; ac();
+  $("#arm").classList.add("down");
+  setTimeout(() => { $("#vinyl").classList.add("spin"); setOnAir(true); crackle(2.2);
+    const c = ac(); if(c){ const t = c.currentTime + .3; [57,60,64,69].forEach((m, i) => play("piano", m, t + i*.12, .9, .6)); } }, 1000);
+  setTimeout(() => el.classList.add("zooming"), 1700);
+  setTimeout(() => go(1), 2700);
+}
+
+/* --- 1. Tormenta --- */
+// lvl: intensidad de la lluvia en pantalla · snd: sonido grabado de fondo (solo entra en el regreso)
+const STORM = [
+  { a:"Silencio", d:"Todos quietos. Esperen la seña.", lvl:0, snd:0 },
+  { a:"Frotar las palmas", d:"Llovizna. Suave, casi no se oye.", lvl:1, snd:0 },
+  { a:"Chasquear los dedos", d:"Empiezan a caer gotas.", lvl:2, snd:0 },
+  { a:"Palmas en las piernas", d:"Aguacero.", lvl:3, snd:0 },
+  { a:"Pisotones", d:"¡Tormenta! Solo el salón.", lvl:4, snd:0 },
+  { a:"Pisotones", d:"La tormenta crece: ahora entra el sonido de fondo.", lvl:4, snd:4 },
+  { a:"Palmas en las piernas", d:"La tormenta se aleja.", lvl:3, snd:3 },
+  { a:"Chasquear los dedos", d:"Quedan algunas gotas.", lvl:2, snd:2 },
+  { a:"Frotar las palmas", d:"Llovizna otra vez.", lvl:1, snd:1 },
+  { a:"Silencio", d:"¿Eso fue una historia? ¿Quién la contó?", lvl:0, snd:0, q:1 }
+];
+let stormI = 0, stormRaf = 0, stormAudio = null;
+addScene({ id:"tormenta", label:"Tormenta con las manos", side:"Intro", num:"01", cls:"storm",
+  html:`<canvas id="rain" aria-hidden="true"></canvas><div class="inner">
+    <div class="eyebrow"><b>Pista 01</b> Para abrir · Todo el salón · Opcional</div>
+    <div class="stormsteps" id="stormSteps">${STORM.map(() => "<i></i>").join("")}</div>
+    <p class="action" id="stormAction">Silencio</p>
+    <p class="lede" id="stormDesc"></p>
+    <div class="howto" id="stormHow">
+      <div data-l="1"><b>1 · Llovizna</b>Frotar las palmas</div><div data-l="2"><b>2 · Gotas</b>Chasquear los dedos</div>
+      <div data-l="3"><b>3 · Aguacero</b>Palmas en las piernas</div><div data-l="4"><b>4 · Tormenta</b>Pisotones</div>
+    </div>
+    <p class="note">Quien dirige avanza con la flecha. En la ida solo suena el salón; el sonido de fondo entra en la tormenta y acompaña el regreso.</p>
+  </div>`,
+  enter(){ stormI = 0; renderStorm(); startRain(); },
+  leave(){ cancelAnimationFrame(stormRaf); stopStormAudio(); },
+  step(dir){ const n = stormI + dir; if(n < 0 || n >= STORM.length) return false; stormI = n; renderStorm(); return true; },
+  sub(){ return `${stormI + 1}/${STORM.length}`; }
+});
+function renderStorm(){
+  const s = STORM[stormI];
+  $("#stormAction").textContent = s.a; $("#stormDesc").textContent = s.d;
+  $$("#stormSteps i").forEach((el, i) => { el.classList.toggle("on", i < stormI); el.classList.toggle("cur", i === stormI); });
+  $$("#stormHow div").forEach(el => el.classList.toggle("on", +el.dataset.l === s.lvl));
+  stormLevel = s.lvl; setStormAudio(s.snd); updateStepper();
+}
+let stormLevel = 0, drops = [];
+function startRain(){
+  const cv = $("#rain"), x = cv.getContext("2d");
+  function size(){ cv.width = cv.clientWidth * devicePixelRatio; cv.height = cv.clientHeight * devicePixelRatio; }
+  size(); addEventListener("resize", size);
+  cancelAnimationFrame(stormRaf);
+  (function frame(){
+    const target = [0, 40, 110, 260, 520][stormLevel];
+    while(drops.length < target) drops.push({ x: Math.random()*cv.width, y: Math.random()*-cv.height, v: 6 + Math.random()*10, l: 10 + Math.random()*24 });
+    if(drops.length > target) drops.splice(0, Math.ceil((drops.length - target) * .05) + 1);
+    x.clearRect(0, 0, cv.width, cv.height);
+    x.strokeStyle = "rgba(21,20,19,.35)"; x.lineWidth = 1.2 * devicePixelRatio;
+    x.beginPath();
+    for(const d of drops){ d.y += d.v * devicePixelRatio * (1 + stormLevel*.25); if(d.y > cv.height){ d.y = -20; d.x = Math.random()*cv.width; } x.moveTo(d.x, d.y); x.lineTo(d.x - d.l*.18, d.y + d.l); }
+    x.stroke();
+    stormRaf = requestAnimationFrame(frame);
+  })();
+}
+function setStormAudio(l){
+  const c = ac(); if(!c) return;
+  if(!stormAudio){ const n = noiseSrc(), lp = c.createBiquadFilter(), g = c.createGain(); lp.type = "lowpass"; lp.frequency.value = 1200; g.gain.value = 0; n.connect(lp).connect(g).connect(master); n.start(); stormAudio = { n, lp, g }; }
+  const t = c.currentTime; stormAudio.g.gain.cancelScheduledValues(t); stormAudio.g.gain.linearRampToValueAtTime([0, .05, .1, .2, .32][l], t + .8);
+  stormAudio.lp.frequency.linearRampToValueAtTime([600, 1400, 2400, 3200, 4200][l], t + .8);
+}
+function stopStormAudio(){ if(stormAudio){ try { stormAudio.g.gain.linearRampToValueAtTime(0, ctx.currentTime + .3); const s = stormAudio; setTimeout(() => s.n.stop(), 400); } catch(_) {} stormAudio = null; } }
+
+/* --- 2. Lado A --- */
+let fanI = 0, fanFlip = false;
+addScene({ id:"lado-a", label:"Lado A · ¿La música cuenta historias?", side:"Lado A", num:"A", cls:"side-a",
+  html:`<div class="inner">
+    <div class="eyebrow"><b>Lado A</b> El texto: Julieta Moliné, «Música y narración» (2020)</div>
+    <h2 class="big h2 wave">${waveText("¿La música cuenta historias?")}</h2>
+    <div class="fanwrap" id="fan">${ACTO_I.map((c, i) => `
+      <button class="fcard" type="button" data-i="${i}" aria-label="${esc(c.t)}">
+        <span class="fflip">
+          <span class="fface ffront">
+            <span class="fnum"><span>A${i + 1} · En palabras simples</span><b>${i + 1}/${ACTO_I.length}</b></span>
+            <span class="photo" data-glyph="${c.g}" style="--px:${20 + (i*13)%60}%;--pa:${(i*37)%180}deg"></span>
+            <span class="ftitle">${esc(c.t)}</span>
+            <span class="ftext">${esc(c.s)}</span>
+            <span class="fhint">Voltear para la versión académica ↻</span>
+          </span>
+          <span class="fface fback">
+            <span class="fnum"><span>A${i + 1} · Lo dice el texto</span><b>${i + 1}/${ACTO_I.length}</b></span>
+            <span class="ftitle">${esc(c.t)}</span>
+            <span class="ftext">${esc(c.a)}</span>
+            <span class="fex"><b>Ejemplo</b>${esc(c.e)}</span>
+            <span class="fwho">${esc(c.w)}</span>
+          </span>
+        </span>
+      </button>`).join("")}</div>
+    <div class="fan-controls"><button class="pbtn ghost" type="button" id="fanPrev">← Anterior</button><button class="pbtn" type="button" id="fanFlip">Voltear</button><button class="pbtn ghost" type="button" id="fanNext">Siguiente →</button></div>
+  </div>`,
+  init(el){
+    $$(".fcard", el).forEach(c => c.addEventListener("click", () => { const i = +c.dataset.i; if(i === fanI){ fanFlip = !fanFlip; } else { fanI = i; fanFlip = false; } layoutFan(); }));
+    $("#fanPrev").onclick = () => { if(fanI > 0){ fanI--; fanFlip = false; layoutFan(); } };
+    $("#fanNext").onclick = () => { if(fanI < ACTO_I.length - 1){ fanI++; fanFlip = false; layoutFan(); } };
+    $("#fanFlip").onclick = () => { fanFlip = !fanFlip; layoutFan(); };
+  },
+  enter(el, dir){ if(dir < 0){ fanI = ACTO_I.length - 1; fanFlip = true; } else { fanI = 0; fanFlip = false; } layoutFan(); },
+  step(dir){
+    if(dir > 0){ if(!fanFlip){ fanFlip = true; } else if(fanI < ACTO_I.length - 1){ fanI++; fanFlip = false; } else return false; }
+    else { if(fanFlip){ fanFlip = false; } else if(fanI > 0){ fanI--; fanFlip = true; } else return false; }
+    layoutFan(); return true;
+  },
+  sub(){ return `A${fanI + 1} · ${fanFlip ? "texto" : "simple"}`; }
+});
+function layoutFan(){
+  $$(".fcard").forEach((c, i) => {
+    const d = i - fanI, ad = Math.abs(d);
+    c.style.transform = `rotate(${d * 9}deg) translateY(${ad * 18}px) scale(${1 - Math.min(ad, 3) * .05})`;
+    c.style.zIndex = 100 - ad; c.style.opacity = ad > 3 ? 0 : 1 - ad * .12;
+    c.classList.toggle("flipped", i === fanI && fanFlip);
+    c.tabIndex = ad === 0 ? 0 : -1;
+  });
+  updateStepper();
+}
+
+/* --- 3. Lado B: tesis --- */
+const THESIS = [
+  ["Leitmotiv","Un motivo pegado a un personaje","Cómo suena según lo que le pasa", "b2-leitmotiv"],
+  ["Llamada y respuesta","Una frase que va y vuelve","Quién la dice y cómo la contesta", "b3-llamada"],
+  ["Copla","La misma melodía en cada estrofa","La letra, que cuenta la historia", "b6-copla"],
+  ["Coro","El estribillo o la voz del grupo","La situación en que reaparece", "b4-coro"],
+  ["Improvisación","La base o el tema conocido","Lo que el músico inventa encima", "b8-improvisacion"],
+  ["Ópera","Todo lo anterior junto","La acción dramática", "b5-opera"],
+  ["Atmósfera","Casi todo, casi sin cambios","Muy poco: por eso es un estado y no un hecho", "b7-atmosfera"]
+];
+addScene({ id:"lado-b", label:"Lado B · Las herramientas", side:"Lado B", num:"B", cls:"side-b",
+  html:`<div class="inner">
+    <div class="eyebrow"><b>Lado B</b> Las herramientas · Estructura, repetición y variación</div>
+    <h2 class="big h2 wave">${waveText("Narrar es repetir y variar")}</h2>
+    <p class="lede">Si la música cuenta historias, ¿con qué lo hace? Cada herramienta es una manera distinta de repetir algo y cambiar otra cosa.</p>
+    <div class="tablewrap"><table class="thesis"><thead><tr><th>Herramienta</th><th>Qué se repite</th><th>Qué varía</th></tr></thead>
+    <tbody>${THESIS.map(r => `<tr data-go="${r[3]}" tabindex="0"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("")}</tbody></table></div>
+    <p class="note">Toca una fila para ir a su pista.</p>
+  </div>`,
+  init(el){ $$("tr[data-go]", el).forEach(tr => { const f = () => go(SCENES.findIndex(s => s.id === tr.dataset.go)); tr.onclick = f; tr.onkeydown = e => { if(e.key === "Enter") f(); }; }); }
+});
+
+/* --- 4-11. Conceptos --- */
+CONCEPTS.forEach(c => addScene({
+  id:c.id, label:`${c.n} · ${c.t}`, short:c.short, side:"Lado B", num:c.n, cls:"concept", concept:c,
+  html:`<div class="inner">
+    <div class="chead">
+      <div class="ctext">
+        <div class="eyebrow"><b>Pista ${c.n}</b> Lado B · Herramientas</div>
+        <h2 class="big h2">${esc(c.t)}</h2>
+        <div class="layer simple"><span>En palabras simples</span><p>${esc(c.s)}</p></div>
+        <div class="layer precise"><span>Lo dice la teoría</span><p>${esc(c.p)}</p></div>
+        <span class="chip"><b>●</b> ${esc(c.m)}</span>
+      </div>
+      <div class="console" id="g-${c.game}"></div>
+    </div>
+    <section class="examples" data-c="${c.id}">
+      <header><h5>Ejemplos · elige el tuyo (${c.ex.length})</h5><div class="flownav"><button type="button" class="fl-prev" aria-label="Ejemplo anterior">←</button><button type="button" class="fl-next" aria-label="Ejemplo siguiente">→</button></div></header>
+      <div class="flow">${c.ex.map((e, i) => { const a = sleeveArt(e.t); return `<button type="button" class="sleeve" data-i="${i}" style="color:${a.fg}" aria-label="${esc(e.t)}"><span class="art" style="background:${a.bg}"></span><span class="yr">${esc(e.y)}</span>${e.ic ? `<svg class="ico" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[e.ic]}</svg>` : ""}${e.cls ? '<span class="cls">En clase</span>' : ""}<span class="st">${esc(e.t)}</span></button>`; }).join("")}</div>
+      <div class="exinfo"></div>
+    </section>
+  </div>`,
+  init(el){ initFlow($(".examples", el), c); GAMES[c.game].init($(`#g-${c.game}`, el)); },
+  leave(){ GAMES[c.game].stop && GAMES[c.game].stop(); }
+}));
+
+function openPlayer(v, st, title, href){
+  const box = $("#player"); $("#playerTitle").textContent = title; $("#playerLink").href = href;
+  $("#playerFrame").innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${v}?start=${st}&autoplay=1&rel=0" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+  box.hidden = false;
+}
+function closePlayer(){ const box = $("#player"); if(box.hidden) return; box.hidden = true; $("#playerFrame").innerHTML = ""; }
+document.addEventListener("click", e => { const a = e.target.closest("a.yt[data-v]"); if(!a || !a.dataset.v || !CAN_EMBED) return; e.preventDefault(); openPlayer(a.dataset.v, a.dataset.s, a.dataset.t, a.href); });
+function initFlow(root, c){
+  let i = Math.max(0, c.ex.findIndex(e => e.cls));
+  const sleeves = $$(".sleeve", root), info = $(".exinfo", root);
+  function lay(){
+    sleeves.forEach((s, k) => { const d = k - i, ad = Math.abs(d);
+      s.style.transform = `translateX(${d * 112}px) translateZ(${-ad * 90}px) rotateY(${d === 0 ? 0 : (d > 0 ? -38 : 38)}deg)`;
+      s.style.zIndex = 50 - ad; s.style.opacity = ad > 3 ? 0 : 1; s.style.filter = ad ? "grayscale(.6) brightness(.92)" : "none"; });
+    const e = c.ex[i];
+    const href = e.v ? `https://www.youtube.com/watch?v=${e.v}${e.s ? "&t=" + e.s + "s" : ""}` : yt(e.q);
+    info.innerHTML = `<div><div class="t">${esc(e.t)}</div><div class="m">${esc(e.a)} · ${esc(e.y)}${e.f ? " · <b>" + esc(e.f) + "</b>" : ""}</div></div><a class="yt" href="${href}" target="_blank" rel="noopener" data-v="${e.v || ""}" data-s="${e.s || 0}" data-t="${esc(e.t)}">${e.v ? (CAN_EMBED ? "▶ Ver fragmento" : "Ver fragmento ↗") : "Buscar en YouTube ↗"}</a><p class="w">${esc(e.w)}</p>`;
+  }
+  sleeves.forEach((s, k) => s.addEventListener("click", () => { i = k; lay(); }));
+  $(".fl-prev", root).onclick = () => { i = Math.max(0, i - 1); lay(); };
+  $(".fl-next", root).onclick = () => { i = Math.min(c.ex.length - 1, i + 1); lay(); };
+  lay();
+}
+
+/* --- 12. Ustedes --- */
+addScene({ id:"ustedes", label:"Ahora ustedes", side:"Bonus", num:"✦", cls:"you",
+  html:`<div class="inner">
+    <div class="eyebrow"><b>Bonus track</b> Ahora ustedes</div>
+    <div class="qrbox">
+      <div id="qr" aria-label="Código QR del sitio"></div>
+      <div style="display:grid;gap:16px">
+        <h2 class="big h2 wave">${waveText("Llévense el disco")}</h2>
+        <p class="lede">Abran el sitio en el celular. Cada pista tiene un juego y varios ejemplos para escoger. Para empezar: <b>Encuentro cercano</b>, en la pista B3. Volumen bajito.</p>
+        <p class="note" id="shareTxt"></p>
+      </div>
+    </div>
+    <div class="gamelist" id="gamelist"></div>
+  </div>`,
+  init(el){
+    const box = $("#qr");
+    try { new QRCode(box, { text: SHARE_URL, width: 220, height: 220, colorDark: "#151413", colorLight: "#f3f1ec", correctLevel: QRCode.CorrectLevel.M }); } catch(_) { box.textContent = SHARE_URL; }
+    $("#shareTxt").textContent = SHARE_URL.replace("https://", "");
+    const names = { seq:"Secuenciador", who:"¿Quién viene?", call:"Encuentro cercano", choir:"De una voz a un pueblo", opera:"Número de conjunto", copla:"Escribe tu copla", mix:"Mezclador de atmósferas", improv:"Improvisa sin miedo" };
+    $("#gamelist").innerHTML = CONCEPTS.map(c => `<button type="button" data-go="${c.id}"><b>${names[c.game]}</b><span>${c.n} · ${esc(c.t)}</span></button>`).join("");
+    $$("#gamelist button").forEach(b => b.onclick = () => go(SCENES.findIndex(s => s.id === b.dataset.go)));
+  }
+});
+
+/* --- 13. Cierre --- */
+addScene({ id:"cierre", label:"Cierre · Eco", side:"Cierre", num:"✕", cls:"close",
+  html:`<div class="inner">
+    <div class="eyebrow"><b>Cierre</b> Umberto Eco · Interpretación y sobreinterpretación</div>
+    <p class="quote">La música no cuenta historias con palabras, pero tiene la forma de una historia, <em>y nosotros ponemos la historia que falta.</em></p>
+    <div class="eco">
+      <div><b>Intención del autor</b><p>Lo que quiso el compositor. Casi siempre es inaccesible.</p></div>
+      <div><b>Intención del lector</b><p>Lo que imagina quien escucha. Es libre, pero no todo vale.</p></div>
+      <div><b>Intención de la obra</b><p>Su coherencia interna descarta las lecturas que no se sostienen. Rorty duda que esa coherencia exista antes de interpretar.</p></div>
+    </div>
+    <p class="lede"><b>Pregunta para el salón:</b> si alguien oyera solo la música, sin ver la imagen, ¿adivinaría la historia?</p>
+    <p class="note">Moliné cierra con la música como «una presencia invisible, pero sonora», que nos toca como fuerza física. Y como intérprete, vuelve a tocar.</p>
+  </div>`
+});
+
+/* --- 14. Notas del disco --- */
+addScene({ id:"notas", label:"Notas del disco", side:"Cierre", num:"♪", cls:"notes",
+  html:`<div class="inner">
+    <div class="eyebrow"><b>Notas del disco</b> Fuentes, créditos y para seguir</div>
+    <h2 class="big h3">Notas del disco</h2>
+    <div class="liner">
+      <h4>Texto base</h4>
+      <ul><li>Moliné, J. (2020). Música y narración. Una síntesis de las teorías narrativas aplicadas a la música. <i>Revista AV Notas</i>, 9, 59–67.</li></ul>
+      <h4>Autores citados por Moliné</h4>
+      <ul>
+        <li>Abbate, C. (2002). Las voces de la música. En S. Alonso (comp.), <i>Música y literatura</i>. Arco/Libros.</li>
+        <li>Abbate, C. (2004). Music: Drastic or gnostic? <i>Critical Inquiry</i>, 30(3).</li>
+        <li>Chion, M. (1999). <i>El sonido</i>. Paidós.</li>
+        <li>Cone, E. T. (1974). <i>The Composer's Voice</i>. University of California Press.</li>
+        <li>Eco, U. et al. (1995). <i>Interpretación y sobreinterpretación</i>. Cambridge University Press.</li>
+        <li>Kramer, L. (2003). Narratología musical: un esbozo teórico. <i>Quodlibet</i>, 25.</li>
+        <li>Maus, F. E. (1991). Music as Narrative. <i>Indiana Theory Review</i>, 12.</li>
+        <li>Maus, F. E. (2003). Narración, drama y emoción en la música instrumental. <i>Quodlibet</i>, 25.</li>
+        <li>McClary, S. (2003). Lo narrativo en música «absoluta». <i>Quodlibet</i>, 25.</li>
+        <li>Nattiez, J.-J. (1990). Peut-on parler de narrativité en musique? <i>Canadian University Music Review</i>, 10(2).</li>
+        <li>Steiner, G. (2003). <i>Lenguaje y silencio</i>. Gedisa.</li>
+      </ul>
+      <h4>Ejemplos</h4>
+      <ul><li>Los fragmentos se citan con fines académicos y de análisis, con su autor y su fuente, y se abren desde YouTube.</li>
+      <li>Los sonidos de los juegos los genera el navegador; las melodías son originales o de dominio público («Martinillo»).</li></ul>
+      <h4>Para seguir explorando</h4>
+      <ul><li><a href="https://listadelistasdeleitmotifs.com/" target="_blank" rel="noopener">La Lista de Listas de Leitmotifs</a>, de Jaime Altozano.</li>
+      <li><a href="https://www.youtube.com/@JaimeAltozano" target="_blank" rel="noopener">Canal de Jaime Altozano</a>.</li></ul>
+    </div>
+  </div>`
+});
+
+/* =========================================================
+   JUEGOS
+   ========================================================= */
+const GAMES = {};
+const ICON = {
+  trombon:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 30h22M10 22h20v16H10M30 22l12-8v32l-12-8"/></svg>',
+  violin:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M30 6l-6 14M20 22c-6-2-10 4-6 8-5 2-4 10 2 11 5 1 8-4 7-7 4 1 7-4 4-8M18 30l10 4"/></svg>',
+  flauta:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 34L40 10l3 4L9 38z"/><circle cx="20" cy="26" r="1.5"/><circle cx="26" cy="22" r="1.5"/><circle cx="32" cy="18" r="1.5"/></svg>',
+  timbal:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><ellipse cx="24" cy="20" rx="16" ry="5"/><path d="M8 20c0 12 8 18 16 18s16-6 16-18M14 6l8 12M34 6l-8 12"/></svg>'
+};
+
+/* Secuenciador */
+GAMES.seq = (() => {
+  const rows = [["Bombo","bombo",36],["Palma","palma",0],["Campana","campana",84],["Bajo","bajo",36]];
+  let grid = [[1,0,0,0,1,0,0,0],[0,0,1,0,0,0,1,0],[0,0,0,1,0,0,0,0],[1,0,0,1,0,0,1,0]];
+  let timer = null, col = 0, bpm = 112, root;
+  function draw(){ $$(".cell", root).forEach(b => b.classList.toggle("on", !!grid[+b.dataset.r][+b.dataset.c])); }
+  function tick(){
+    const c = ac(); const t = c ? c.currentTime + .02 : 0;
+    grid.forEach((r, ri) => { if(r[col]) { const [, inst, n] = rows[ri]; play(inst, ri === 3 ? [36,36,43,41][Math.floor(col/2)] : n, t, ri === 3 ? .18 : .2, .9); } });
+    $$(".cell", root).forEach(b => b.classList.toggle("play", +b.dataset.c === col));
+    col = (col + 1) % 8;
+  }
+  function start(){ stop(); ac(); col = 0; timer = setInterval(tick, 60000 / bpm / 2); $("#seqPlay").textContent = "■ Parar"; $("#seqPlay").classList.add("on"); }
+  function stop(){ if(timer){ clearInterval(timer); timer = null; } if(root){ $$(".cell", root).forEach(b => b.classList.remove("play")); const p = $("#seqPlay"); if(p){ p.textContent = "▶ Repetir"; p.classList.remove("on"); } } }
+  return {
+    init(el){ root = el;
+      el.innerHTML = `<header><h4>Secuenciador</h4><span class="tag">Juego</span></header>
+        <p class="how">Este patrón se repite en bucle. Escúchalo y luego varíalo: toca las casillas, cambia la velocidad o deja que el azar lo transforme.</p>
+        <div class="seq">${rows.map((r, ri) => `<span class="rl">${r[0]}</span>` + grid[ri].map((_, ci) => `<button type="button" class="cell" data-r="${ri}" data-c="${ci}" aria-label="${r[0]} paso ${ci + 1}"></button>`).join("")).join("")}</div>
+        <div class="row"><button type="button" class="pbtn" id="seqPlay">▶ Repetir</button><button type="button" class="pbtn ghost" id="seqVar">Variar</button><button type="button" class="pbtn ghost" id="seqRev">Al revés</button><button type="button" class="pbtn ghost" id="seqClr">Borrar</button></div>
+        <label class="fader">Velocidad <input type="range" id="seqBpm" min="70" max="170" value="112"></label>`;
+      draw();
+      $$(".cell", el).forEach(b => b.onclick = () => { const r = +b.dataset.r, c = +b.dataset.c; grid[r][c] = grid[r][c] ? 0 : 1; draw(); if(grid[r][c]) play(rows[r][1], rows[r][2], undefined, .2); });
+      $("#seqPlay").onclick = () => timer ? stop() : start();
+      $("#seqVar").onclick = () => { for(let k = 0; k < 3; k++){ const r = Math.floor(Math.random()*4), c = Math.floor(Math.random()*8); grid[r][c] = grid[r][c] ? 0 : 1; } draw(); };
+      $("#seqRev").onclick = () => { grid = grid.map(r => r.slice().reverse()); draw(); };
+      $("#seqClr").onclick = () => { grid = grid.map(r => r.map(() => 0)); draw(); };
+      const sb = $("#seqBpm"); setRange(sb); sb.oninput = () => { bpm = +sb.value; setRange(sb); if(timer) start(); };
+    }, stop };
+})();
+
+/* ¿Quién viene? */
+GAMES.who = (() => {
+  const CH = [
+    { n:"La heroína", d:"Fanfarria que sube", inst:"trombon", col:"#e9481f", g:"H", m:[[55,.25],[60,.25],[67,.5],[64,.25],[67,.25],[72,.9]] },
+    { n:"El villano", d:"Grave y cromático", inst:"violin", col:"#151413", g:"V", m:[[45,.5],[46,.5],[45,.5],[51,.4],[50,1]] },
+    { n:"El amor", d:"Melodía que respira", inst:"flauta", col:"#86827a", g:"A", m:[[76,.4],[74,.2],[72,.4],[74,.4],[76,.3],[79,.9]] }
+  ];
+  let root, mode = 1, answer = [], picks = [], score = 0, round = 0, busy = false;
+  function motif(ci, t0){ const c = ac(); let t = t0 ?? c.currentTime + .05; const ch = CH[ci]; ch.m.forEach(([n, d]) => { play(ch.inst, n, t, d*.95, 1); t += d; }); return t; }
+  function light(ci, ms){ const b = $$(".char", root)[ci]; b.classList.add("lit"); setTimeout(() => b.classList.remove("lit"), ms); }
+  function status(h){ $("#whoStatus").innerHTML = h; }
+  function ask(){
+    if(!ac()) return; busy = true; picks = []; $$(".char", root).forEach(b => b.classList.remove("right", "wrong"));
+    round++;
+    answer = mode === 1 ? [Math.floor(Math.random()*3)] : (() => { const a = Math.floor(Math.random()*3); let b; do { b = Math.floor(Math.random()*3); } while(b === a); return [a, b]; })();
+    status(`Ronda ${round} · Escucha…`);
+    const t0 = ctx.currentTime + .1; let end = t0;
+    answer.forEach(ci => { end = Math.max(end, motif(ci, t0)); });
+    setTimeout(() => { busy = false; status(`Ronda ${round} · ${mode === 1 ? "¿Quién viene?" : "¿Quiénes son? Elige dos"}`); }, (end - ctx.currentTime) * 1000);
+  }
+  function pick(ci){
+    if(busy || !answer.length){ motif(ci); light(ci, 900); return; }
+    if(picks.includes(ci)) return; picks.push(ci);
+    const ok = answer.includes(ci); $$(".char", root)[ci].classList.add(ok ? "right" : "wrong");
+    if(!ok){ status(`No era. Era <b>${answer.map(a => CH[a].n).join(" + ")}</b>. Puntos: ${score}`); answer = []; return; }
+    if(picks.length === answer.length){ score++; status(`¡Exacto! Puntos: <b>${score}</b>`); answer = []; }
+  }
+  return {
+    init(el){ root = el;
+      el.innerHTML = `<header><h4>¿Quién viene?</h4><span class="tag">Juego · para todo el salón</span></header>
+        <p class="how">Cada personaje tiene su motivo. Tócalos para aprenderlos. Luego oprime «Adivinar»: suena un motivo y hay que decir quién se acerca.</p>
+        <div class="chars">${CH.map((c, i) => `<button type="button" class="char" data-i="${i}"><span class="face" style="background:${c.col}">${c.g}</span><b>${c.n}</b><small>${c.d}</small></button>`).join("")}</div>
+        <div class="row"><button type="button" class="pbtn" id="whoGo">Adivinar</button><button type="button" class="pbtn ghost" id="whoMode">Nivel 2: dos a la vez</button></div>
+        <div class="status" id="whoStatus">Toca un personaje para oír su motivo.</div>`;
+      $$(".char", el).forEach(b => b.onclick = () => pick(+b.dataset.i));
+      $("#whoGo").onclick = ask;
+      $("#whoMode").onclick = e => { mode = mode === 1 ? 2 : 1; e.currentTarget.classList.toggle("on", mode === 2); e.currentTarget.textContent = mode === 2 ? "Nivel 2: activo" : "Nivel 2: dos a la vez"; };
+    }};
+})();
+
+/* Encuentro cercano (Simón) */
+GAMES.call = (() => {
+  const INS = [
+    { k:"trombon", n:"Trombón", ph:[[43,.35],[50,.5]] },
+    { k:"violin", n:"Violín", ph:[[76,.25],[79,.45]] },
+    { k:"flauta", n:"Flauta", ph:[[84,.25],[81,.45]] },
+    { k:"timbal", n:"Timbal", ph:[[40,.2],[40,.4]] }
+  ];
+  let root, seq = [], pos = 0, busy = false, active = false, best = store.get("nm-best", 0);
+  function phrase(i, t){ const c = ac(); t = t ?? c.currentTime + .03; INS[i].ph.forEach(([n, d]) => { play(INS[i].k, n, t, d, 1); t += d; }); return t; }
+  function lit(i, ms){ const p = $$(".pad", root)[i]; p.classList.add("lit"); setTimeout(() => p.classList.remove("lit"), ms); }
+  function status(h){ $("#callStatus").innerHTML = h; }
+  function playSeq(){
+    busy = true; status(`La orquesta habla… (frase de ${seq.length})`);
+    const c = ac(); let t = c.currentTime + .4; const step = 900;
+    seq.forEach((ins, k) => { setTimeout(() => { phrase(ins); lit(ins, 600); }, 400 + k*step); });
+    setTimeout(() => { busy = false; pos = 0; status(`Tu turno: responde con los mismos instrumentos, en orden.`); }, 400 + seq.length*step);
+  }
+  function next(){ seq.push(Math.floor(Math.random()*4)); playSeq(); }
+  function hit(i){
+    if(!ac()) return; phrase(i); lit(i, 300);
+    if(!active || busy) return;
+    if(seq[pos] !== i){ active = false; status(`Se cortó la comunicación en la frase ${seq.length}. Récord: <b>${best}</b>. Oprime «Contactar» para intentarlo otra vez.`); return; }
+    pos++;
+    if(pos === seq.length){ if(seq.length > best){ best = seq.length; store.set("nm-best", best); } status(`¡Respuesta recibida! Frase de <b>${seq.length}</b>. Récord: ${best}`); setTimeout(next, 1100); }
+  }
+  return {
+    init(el){ root = el;
+      el.innerHTML = `<header><h4>Encuentro cercano</h4><span class="tag">Juego · llamada y respuesta</span></header>
+        <p class="how">Una orquesta intenta comunicarse contigo. Cada vez que te habla, respóndele con los mismos instrumentos en el mismo orden. Cada ronda la frase es más larga. Teclas 1 a 4.</p>
+        <div class="pads">${INS.map((x, i) => `<button type="button" class="pad" data-i="${i}">${ICON[x.k]}<span>${x.n}</span><kbd>${i + 1}</kbd></button>`).join("")}</div>
+        <div class="row"><button type="button" class="pbtn" id="callGo">Contactar</button></div>
+        <div class="status" id="callStatus">Toca los instrumentos para conocerlos. Récord: ${best}</div>`;
+      $$(".pad", el).forEach(p => p.onclick = () => hit(+p.dataset.i));
+      $("#callGo").onclick = () => { ac(); seq = []; active = true; next(); };
+    },
+    key(e){ const n = +e.key; if(n >= 1 && n <= 4){ hit(n - 1); return true; } return false; },
+    stop(){ active = false; }
+  };
+})();
+
+/* Coro */
+GAMES.choir = (() => {
+  let root, voices = [], n = 1, on = false;
+  const CHORD = [48, 52, 55, 60, 64, 67, 72, 55];
+  function startVoice(k){
+    const c = ac(), f = mtof(CHORD[k % CHORD.length]) * Math.pow(2, (Math.random()*24 - 12)/1200);
+    const o = c.createOscillator(), f1 = c.createBiquadFilter(), f2 = c.createBiquadFilter(), g = c.createGain(), mix = c.createGain();
+    o.type = "sawtooth"; o.frequency.value = f; f1.type = "bandpass"; f1.frequency.value = 700 + Math.random()*80; f1.Q.value = 7; f2.type = "bandpass"; f2.frequency.value = 1100 + Math.random()*100; f2.Q.value = 9;
+    o.connect(f1).connect(mix); o.connect(f2).connect(mix); mix.gain.value = 2; mix.connect(g); g.connect(master);
+    const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 4.6 + Math.random()*1.4; lg.gain.value = f*.009; l.connect(lg).connect(o.frequency);
+    g.gain.value = 0; g.gain.linearRampToValueAtTime(.55 / Math.sqrt(Math.max(1, n)), c.currentTime + .6);
+    o.start(); l.start(); return { o, l, g };
+  }
+  function sync(){
+    const c = ac(); if(!c) return;
+    while(on && voices.length < n) voices.push(startVoice(voices.length));
+    while(voices.length > (on ? n : 0)){ const v = voices.pop(); v.g.gain.cancelScheduledValues(c.currentTime); v.g.gain.linearRampToValueAtTime(0, c.currentTime + .4); setTimeout(() => { try { v.o.stop(); v.l.stop(); } catch(_) {} }, 500); }
+    voices.forEach(v => v.g.gain.linearRampToValueAtTime(.55 / Math.sqrt(Math.max(1, n)), c.currentTime + .3));
+    $$(".vface", root).forEach((f, i) => f.classList.toggle("on", on && i < n));
+    $("#choirN").textContent = n === 1 ? "1 voz: una persona" : n < 6 ? `${n} voces: un grupo` : `${n} voces: un pueblo`;
+  }
+  function stop(){ on = false; if(root){ sync(); const b = $("#choirGo"); if(b){ b.textContent = "▶ Cantar"; b.classList.remove("on"); } } }
+  return {
+    init(el){ root = el;
+      el.innerHTML = `<header><h4>De una voz a un pueblo</h4><span class="tag">Experimento</span></header>
+        <p class="how">Oprime «Cantar» y sube el fader. Escucha el momento en que una persona deja de sonar como alguien y empieza a sonar como una multitud.</p>
+        <div class="faces">${Array.from({ length:16 }, (_, i) => `<span class="vface" style="--i:${i}"></span>`).join("")}</div>
+        <label class="fader">Voces <input type="range" id="choirR" min="1" max="16" value="1"></label>
+        <div class="row"><button type="button" class="pbtn" id="choirGo">▶ Cantar</button><span class="status" id="choirN">1 voz: una persona</span></div>`;
+      const r = $("#choirR"); setRange(r);
+      r.oninput = () => { n = +r.value; setRange(r); sync(); };
+      $("#choirGo").onclick = e => { on = !on; e.currentTarget.textContent = on ? "■ Callar" : "▶ Cantar"; e.currentTarget.classList.toggle("on", on); sync(); };
+    }, stop };
+})();
+
+/* Ópera: número de conjunto con Martinillo (canon de dominio público) */
+GAMES.opera = (() => {
+  // melodía en corcheas: [nota, duración en corcheas]
+  const MEL = [[60,2],[62,2],[64,2],[60,2],[60,2],[62,2],[64,2],[60,2],[64,2],[65,2],[67,4],[64,2],[65,2],[67,4],
+    [67,1],[69,1],[67,1],[65,1],[64,2],[60,2],[67,1],[69,1],[67,1],[65,1],[64,2],[60,2],[60,2],[55,2],[60,4],[60,2],[55,2],[60,4]];
+  const EV = []; { let p = 0; MEL.forEach(([n, d]) => { EV.push({ p, n, d }); p += d; }); }
+  const LEN = 64;
+  const ROLES = [
+    { n:"La condesa", s:"soprano · entra 1.ª", inst:"voz", tr:12 },
+    { n:"El criado", s:"flauta · entra 2.º", inst:"flauta", tr:12 },
+    { n:"El conde", s:"violín · entra 3.º", inst:"violin", tr:0 },
+    { n:"El jardinero", s:"trombón · entra 4.º", inst:"trombon", tr:-12 }
+  ];
+  let root, act = [false, false, false, false], timer = null, tick = 0;
+  const STEP = 60 / 104 / 2;
+  function loop(){
+    const c = ac(); const t = c.currentTime + .03;
+    ROLES.forEach((r, k) => {
+      if(!act[k]) return; const local = tick - k*8; if(local < 0) return; const p = local % LEN;
+      const ev = EV.find(e => e.p === p); if(ev){ play(r.inst, ev.n + r.tr, t, ev.d*STEP*.95, .8); const b = $$(".role", root)[k]; b.classList.add("sing"); setTimeout(() => b.classList.remove("sing"), 150); }
+    });
+    // pentagrama: notas que pasan
+    tick++;
+  }
+  function ensure(){ if(act.some(Boolean)){ if(!timer){ tick = 0; timer = setInterval(loop, STEP*1000); } } else stop(); }
+  function stop(){ if(timer){ clearInterval(timer); timer = null; } }
+  function draw(){ $$(".role", root).forEach((b, k) => b.classList.toggle("on", act[k])); }
+  return {
+    init(el){ root = el;
+      el.innerHTML = `<header><h4>Número de conjunto</h4><span class="tag">Juego</span></header>
+        <p class="how">Cuatro personajes cantan «Martinillo» en canon, cada uno entra dos compases después del anterior. Actívalos uno por uno: cada voz se entiende sola y también todas juntas.</p>
+        <div class="roles">${ROLES.map((r, k) => `<button type="button" class="role" data-k="${k}"><b>${r.n}</b><small>${r.s}</small></button>`).join("")}</div>
+        <div class="row"><button type="button" class="pbtn" id="opAll">Todos juntos</button><button type="button" class="pbtn ghost" id="opOne">Solo la condesa</button><button type="button" class="pbtn ghost" id="opStop">Silencio</button></div>
+        <p class="note">Melodía tradicional de dominio público.</p>`;
+      $$(".role", el).forEach(b => b.onclick = () => { ac(); const k = +b.dataset.k; act[k] = !act[k]; draw(); ensure(); });
+      $("#opAll").onclick = () => { ac(); stop(); act = [true, true, true, true]; draw(); ensure(); };
+      $("#opOne").onclick = () => { ac(); stop(); act = [true, false, false, false]; draw(); ensure(); };
+      $("#opStop").onclick = () => { act = [false, false, false, false]; draw(); stop(); };
+    }, stop(){ stop(); act = [false, false, false, false]; if(root) draw(); } };
+})();
+
+/* Copla */
+GAMES.copla = (() => {
+  const MEL = [62,62,64,66,67,66,64,62,64,64,66,67,69,67,66,64];
+  const DEFAULT = `Salió Martín de su casa
+con su tambor y un farol;
+dijo que volvía en mayo
+cuando calentara el sol.
+
+Pasó mayo, pasó junio,
+pasó el verano entero,
+y en la ventana su madre
+contaba los aguaceros.
+
+Un día llegó una carta
+con olor a mar lejano:
+«Madre, aprendí a tocar
+con el tambor en la mano».
+
+Volvió Martín en diciembre
+y no traía farol:
+traía un pueblo entero
+cantando detrás su son.`;
+  let root, timer = null, txt = store.get("nm-copla", DEFAULT), verse = 0, note = 0;
+  const Q = .42;
+  function verses(){ return txt.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean); }
+  function render(){ const v = verses(); $("#kar").innerHTML = v.map((s, i) => `<div class="verse${i === verse && timer ? " cur" : ""}">${esc(s)}</div>`).join(""); $("#coplaSt").innerHTML = timer ? `Misma melodía · estrofa <b>${verse + 1}</b> de ${v.length}` : `${v.length} estrofas, una sola melodía`; }
+  function step(){
+    const c = ac(); const t = c.currentTime + .02;
+    play("piano", MEL[note], t, Q*.9, .8); if(note % 4 === 0) play("bajo", MEL[note] - 24, t, Q*1.8, .7);
+    $$(".melodybar i", root).forEach((b, i) => b.classList.toggle("on", i === note));
+    note++;
+    if(note >= MEL.length){ note = 0; verse++; if(verse >= verses().length){ stop(); return; } render(); }
+  }
+  function start(){ stop(); ac(); verse = 0; note = 0; timer = setInterval(step, Q*1000); render(); $("#coplaGo").textContent = "■ Parar"; }
+  function stop(){ if(timer){ clearInterval(timer); timer = null; } if(root){ render(); const b = $("#coplaGo"); if(b) b.textContent = "▶ Cantar la historia"; $$(".melodybar i", root).forEach(b => b.classList.remove("on")); } }
+  return {
+    init(el){ root = el;
+      el.innerHTML = `<header><h4>Escribe tu copla</h4><span class="tag">Juego</span></header>
+        <p class="how">La melodía es siempre la misma; la historia avanza estrofa por estrofa. Cambia el texto y escribe la tuya (separa las estrofas con una línea en blanco).</p>
+        <div class="melodybar">${MEL.map(n => `<i style="height:${30 + (n - 60)*7}%"></i>`).join("")}</div>
+        <div class="karaoke" id="kar"></div>
+        <div class="row"><button type="button" class="pbtn" id="coplaGo">▶ Cantar la historia</button><button type="button" class="pbtn ghost" id="coplaEdit">Escribir la mía</button><span class="status" id="coplaSt"></span></div>
+        <textarea id="coplaTxt" hidden aria-label="Texto de la copla"></textarea>`;
+      const ta = $("#coplaTxt"); ta.value = txt;
+      ta.oninput = () => { txt = ta.value; store.set("nm-copla", txt); render(); };
+      $("#coplaEdit").onclick = () => { ta.hidden = !ta.hidden; if(!ta.hidden) ta.focus(); };
+      $("#coplaGo").onclick = () => timer ? stop() : start();
+      render();
+    }, stop };
+})();
+
+/* Atmósfera */
+GAMES.mix = (() => {
+  let root, nodes = null, bellT = null, dropT = null;
+  const CH = [["Lluvia","rain"],["Viento","wind"],["Cuerdas graves","drone"],["Campanas","bells"]];
+  const PRESETS = { "Tormenta":[85,70,40,0], "Bosque de otoño":[20,35,30,45], "Calma":[0,10,55,25] };
+  let vals = [30, 20, 40, 20], on = false;
+  function build(){
+    const c = ac(); const n = {};
+    n.rainG = c.createGain(); const r = noiseSrc(), hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 900; r.connect(hp).connect(n.rainG).connect(master); r.start(); n.r = r;
+    n.windG = c.createGain(); const w = noiseSrc(), bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 500; bp.Q.value = 1.4;
+    const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = .13; lg.gain.value = 300; l.connect(lg).connect(bp.frequency); l.start();
+    w.connect(bp).connect(n.windG).connect(master); w.start(); n.w = w; n.l = l;
+    n.droneG = c.createGain(); const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 520; lp.connect(n.droneG).connect(master);
+    n.osc = [33, 40, 45, 52].map((m, i) => { const o = c.createOscillator(); o.type = "sawtooth"; o.frequency.value = mtof(m) * (1 + (i - 1.5)*.002); o.connect(lp); o.start(); return o; });
+    n.bellG = c.createGain(); n.bellG.connect(master);
+    nodes = n; apply();
+    const pent = [69, 72, 74, 76, 79, 81, 84];
+    bellT = setInterval(() => { if(vals[3] > 2 && Math.random() < .55) play("campana", pent[Math.floor(Math.random()*pent.length)], undefined, 2, .8, nodes.bellG); }, 700);
+    dropT = setInterval(() => { if(vals[0] > 2){ const t = c.currentTime, k = Math.floor(vals[0] / 18); for(let i = 0; i < k; i++){ const at = t + Math.random()*.25, o = c.createOscillator(), g = c.createGain(); o.frequency.value = 1500 + Math.random()*2200; o.connect(g).connect(n.rainG); g.gain.setValueAtTime(.08, at); g.gain.exponentialRampToValueAtTime(.0001, at + .03); o.start(at); o.stop(at + .04); } } }, 250);
+  }
+  function apply(){ if(!nodes) return; const t = ctx.currentTime, k = v => v / 100;
+    nodes.rainG.gain.linearRampToValueAtTime(k(vals[0])*.22, t + .3); nodes.windG.gain.linearRampToValueAtTime(k(vals[1])*.5, t + .3);
+    nodes.droneG.gain.linearRampToValueAtTime(k(vals[2])*.09, t + .3); nodes.bellG.gain.linearRampToValueAtTime(k(vals[3])*1.2, t + .3); }
+  function stop(){ on = false; if(nodes){ const n = nodes; nodes = null; const t = ctx.currentTime; [n.rainG, n.windG, n.droneG, n.bellG].forEach(g => g.gain.linearRampToValueAtTime(0, t + .5)); setTimeout(() => { try { n.r.stop(); n.w.stop(); n.l.stop(); n.osc.forEach(o => o.stop()); } catch(_) {} }, 600); }
+    clearInterval(bellT); clearInterval(dropT); const b = root && $("#mixGo"); if(b){ b.textContent = "▶ Encender"; b.classList.remove("on"); } }
+  function syncUI(){ $$("input[type=range]", root).forEach((r, i) => { r.value = vals[i]; setRange(r); }); }
+  return {
+    init(el){ root = el;
+      el.innerHTML = `<header><h4>Mezclador de atmósferas</h4><span class="tag">Juego</span></header>
+        <p class="how">Enciende y mueve los faders. No va a pasar nada, y aun así vas a sentir un lugar y un estado de ánimo.</p>
+        <div class="mixer">${CH.map((c, i) => `<label class="fader">${c[0]}<input type="range" min="0" max="100" value="${vals[i]}" data-i="${i}"></label>`).join("")}</div>
+        <div class="row"><button type="button" class="pbtn" id="mixGo">▶ Encender</button>${Object.keys(PRESETS).map(p => `<button type="button" class="pbtn ghost" data-p="${p}">${p}</button>`).join("")}</div>`;
+      $$("input[type=range]", el).forEach(r => { setRange(r); r.oninput = () => { vals[+r.dataset.i] = +r.value; setRange(r); apply(); }; });
+      $("#mixGo").onclick = e => { if(on){ stop(); } else { on = true; build(); e.currentTarget.textContent = "■ Apagar"; e.currentTarget.classList.add("on"); } };
+      $$("[data-p]", el).forEach(b => b.onclick = () => { vals = PRESETS[b.dataset.p].slice(); syncUI(); if(!on){ $("#mixGo").click(); } else apply(); });
+    }, stop };
+})();
+
+/* Improvisación */
+GAMES.improv = (() => {
+  const KEYS = ["a","s","d","f","g","h","j","k","l"];
+  const NOTES = [69,72,74,76,79,81,84,86,88];
+  const NAMES = ["La","Do","Re","Mi","Sol","La","Do","Re","Mi"];
+  let root, timer = null, beat = 0, trail = [], raf = 0;
+  const BEAT = 60 / 96 / 2;
+  function back(){
+    const c = ac(); const t = c.currentTime + .02;
+    const bass = [45,45,52,45,48,48,43,47][Math.floor(beat/2) % 8];
+    if(beat % 2 === 0) play("bajo", bass, t, BEAT*1.6, .9);
+    play("hat", 0, t, .05, beat % 2 ? .5 : .9);
+    if(beat % 8 === 0) play("bombo", 0, t, .2, .8);
+    beat++;
+  }
+  function hit(i){ ac(); play("piano", NOTES[i], undefined, .35, 1); const k = $$(".key", root)[i]; k.classList.add("lit"); setTimeout(() => k.classList.remove("lit"), 160); trail.push({ i, t: performance.now() }); }
+  function drawTrail(){
+    const cv = $("#improvTrail"); if(!cv){ return; } const x = cv.getContext("2d"); const W = cv.width = cv.clientWidth * devicePixelRatio, H = cv.height = cv.clientHeight * devicePixelRatio;
+    const now = performance.now(); trail = trail.filter(p => now - p.t < 4000);
+    x.clearRect(0, 0, W, H);
+    trail.forEach(p => { const age = (now - p.t) / 4000, px = W - age*W, py = H - (p.i + .5) / 9 * H; x.fillStyle = `rgba(233,72,31,${1 - age})`; x.fillRect(px, py - 3*devicePixelRatio, 26*devicePixelRatio, 6*devicePixelRatio); });
+    raf = requestAnimationFrame(drawTrail);
+  }
+  function start(){ stopBack(); ac(); beat = 0; timer = setInterval(back, BEAT*1000); $("#impGo").textContent = "■ Parar la base"; $("#impGo").classList.add("on"); }
+  function stopBack(){ if(timer){ clearInterval(timer); timer = null; } const b = root && $("#impGo"); if(b){ b.textContent = "▶ Poner la base"; b.classList.remove("on"); } }
+  return {
+    init(el){ root = el;
+      el.innerHTML = `<header><h4>Improvisa sin miedo</h4><span class="tag">Juego</span></header>
+        <p class="how">Pon la base y toca lo que se te ocurra, con el mouse o con las teclas A a L. Estas notas son una escala pentatónica: ninguna suena mal sobre esta base.</p>
+        <div class="keys">${NOTES.map((n, i) => `<button type="button" class="key" data-i="${i}"><span>${NAMES[i]}</span><kbd>${KEYS[i].toUpperCase()}</kbd></button>`).join("")}</div>
+        <canvas id="improvTrail" aria-hidden="true"></canvas>
+        <div class="row"><button type="button" class="pbtn" id="impGo">▶ Poner la base</button></div>`;
+      $$(".key", el).forEach(k => k.onpointerdown = () => hit(+k.dataset.i));
+      $("#impGo").onclick = () => timer ? stopBack() : start();
+      cancelAnimationFrame(raf); drawTrail();
+    },
+    key(e){ const i = KEYS.indexOf(e.key.toLowerCase()); if(i >= 0 && !e.repeat){ hit(i); return true; } return false; },
+    stop(){ stopBack(); }
+  };
+})();
+
+/* =========================================================
+   MOTOR DE NAVEGACIÓN
+   ========================================================= */
+let cur = -1;
+SCENES.forEach((s, i) => {
+  const el = document.createElement("section"); el.className = "scene " + (s.cls || ""); el.id = "s-" + s.id; el.innerHTML = s.html;
+  el.setAttribute("aria-label", s.label); stage.appendChild(el); s.el = el;
+});
+SCENES.forEach(s => s.init && s.init(s.el));
+
+// línea de progreso y lista de pistas
+const groove = $("#groove");
+groove.innerHTML = SCENES.map((s, i) => `<button type="button" class="dot${["lado-a","lado-b"].includes(s.id) ? " side" : ""}" data-i="${i}" aria-label="${esc(s.label)}"><span class="tip">${esc(s.num)} · ${esc(s.short || s.label)}</span></button>`).join("");
+$$(".dot", groove).forEach(d => d.onclick = () => go(+d.dataset.i));
+const groups = [["Intro y Lado A", s => ["Intro","Lado A"].includes(s.side)], ["Lado B", s => s.side === "Lado B"], ["Bonus y cierre", s => ["Bonus","Cierre"].includes(s.side)]];
+$("#tlCols").innerHTML = groups.map(([h, f]) => `<div class="tl-col"><h4>${h}</h4><ol>${SCENES.map((s, i) => f(s) ? `<li><button type="button" data-i="${i}"><span class="n">${esc(s.num)}</span><span>${esc(s.label)}</span></button></li>` : "").join("")}</ol></div>`).join("");
+$$("#tlCols button").forEach(b => b.onclick = () => { closeList(); go(+b.dataset.i); });
+
+function setOnAir(v){ $("#onair").classList.toggle("on", v); $("#led").classList.toggle("on", v); }
+function updateStepper(){
+  const s = SCENES[cur]; if(!s) return;
+  $("#stepper").textContent = s.sub ? s.sub() : `${cur + 1}/${SCENES.length}`;
+}
+function go(i, dir){
+  if(i < 0 || i >= SCENES.length || i === cur) return;
+  dir = dir ?? (i > cur ? 1 : -1);
+  const prev = SCENES[cur];
+  if(prev){ prev.leave && prev.leave(prev.el); prev.el.classList.remove("active"); prev.el.classList.toggle("gone", dir > 0); }
+  cur = i; const s = SCENES[i];
+  s.el.classList.remove("gone"); s.el.scrollTop = 0;
+  s.enter && s.enter(s.el, dir);
+  requestAnimationFrame(() => s.el.classList.add("active"));
+  $$(".dot", groove).forEach((d, k) => { d.classList.toggle("here", k === i); d.classList.toggle("done", k < i); });
+  $("#where").textContent = `${s.side} · ${s.short || s.label}`;
+  if(i > 0) setOnAir(true);
+  try { history.replaceState(null, "", "#" + s.id); } catch(_) { location.hash = s.id; }
+  updateStepper();
+}
+function next(){ const s = SCENES[cur]; if(s.step && s.step(1)) return; go(cur + 1, 1); }
+function prev(){ const s = SCENES[cur]; if(s.step && s.step(-1)) return; go(cur - 1, -1); }
+$("#nextBtn").onclick = next; $("#prevBtn").onclick = prev;
+$("#arm").onclick = () => { if(cur === 0) dropNeedle(); };
+$("#drop").onclick = dropNeedle;
+
+function openList(){ $("#tracklist").hidden = false; $("#closeList").focus(); }
+function closeList(){ $("#tracklist").hidden = true; }
+$("#playerClose").onclick = closePlayer; $("#player").onclick = e => { if(e.target.id === "player") closePlayer(); };
+$("#listBtn").onclick = openList; $("#closeList").onclick = closeList;
+$("#tracklist").onclick = e => { if(e.target.id === "tracklist") closeList(); };
+
+$("#soundBtn").onclick = e => { soundOn = !soundOn; e.currentTarget.setAttribute("aria-pressed", String(soundOn)); e.currentTarget.textContent = "Sonido: " + (soundOn ? "sí" : "no"); if(master) master.gain.value = soundOn ? .8 : 0; };
+function toggleFS(){ try { if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else document.exitFullscreen().catch(() => {}); } catch(_) {} }
+$("#fsBtn").onclick = toggleFS;
+
+addEventListener("keydown", e => {
+  const tag = (e.target.tagName || "").toLowerCase();
+  if(tag === "textarea" || tag === "input" && e.target.type !== "range") return;
+  if(e.key === "Escape"){ closeList(); closePlayer(); return; }
+  if(!$("#player").hidden) return;
+  if(!$("#tracklist").hidden) return;
+  const s = SCENES[cur];
+  const g = s && s.concept && GAMES[s.concept.game];
+  if(g && g.key && !e.metaKey && !e.ctrlKey && g.key(e)){ e.preventDefault(); return; }
+  if(["ArrowRight","PageDown"].includes(e.key) || (e.key === " " && tag !== "button")){ e.preventDefault(); next(); }
+  else if(["ArrowLeft","PageUp"].includes(e.key)){ e.preventDefault(); prev(); }
+  else if(e.key === "f" || e.key === "F"){ toggleFS(); }
+});
+// deslizar en el celular
+let tx = null, ty = null;
+stage.addEventListener("touchstart", e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+stage.addEventListener("touchend", e => { if(tx === null) return; const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = null;
+  if(Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.6 && !e.target.closest(".flow,.console,input,.fanwrap")) dx < 0 ? next() : prev(); }, { passive: true });
+
+// medidor VU con la salida real
+(function vuLoop(){
+  const cv = $("#vu"), x = cv.getContext("2d"), W = cv.width, H = cv.height, data = new Uint8Array(64);
+  (function f(){
+    x.clearRect(0, 0, W, H);
+    let lvl = 0; if(analyser){ analyser.getByteTimeDomainData(data); for(const v of data) lvl = Math.max(lvl, Math.abs(v - 128) / 128); }
+    const bars = 12;
+    for(let i = 0; i < bars; i++){ const on = i / bars < lvl * 1.6; x.fillStyle = on ? (i > 9 ? "#e9481f" : i > 6 ? "#c6ea3b" : "#151413") : "rgba(21,20,19,.14)"; x.fillRect(i * (W / bars) + 1, 6, W / bars - 3, H - 12); }
+    requestAnimationFrame(f);
+  })();
+})();
+
+// arranque: la pista del enlace o la portada
+const start = Math.max(0, SCENES.findIndex(s => "#" + s.id === location.hash));
+go(start, 1);
+addEventListener("hashchange", () => { const i = SCENES.findIndex(s => "#" + s.id === location.hash); if(i >= 0 && i !== cur) go(i); });
+</script>
+
+</body>
+</html>
