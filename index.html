@@ -752,26 +752,26 @@ function dropNeedle(){
 // lvl: intensidad de la lluvia en pantalla · snd: sonido grabado de fondo (solo entra en el regreso)
 const STORM = [
   { a:"Silencio", d:"Todos quietos. Esperen la seña.", lvl:0, snd:0 },
-  { a:"Frotar las palmas", d:"Llovizna. Suave, casi no se oye.", lvl:1, snd:0 },
-  { a:"Chasquear los dedos", d:"Empiezan a caer gotas.", lvl:2, snd:0 },
-  { a:"Palmas en las piernas", d:"Aguacero.", lvl:3, snd:0 },
-  { a:"Pisotones", d:"¡Tormenta!", lvl:4, snd:0 },
-  { a:"Pisotones", d:"La tormenta en su punto más fuerte.", lvl:4, snd:4 },
-  { a:"Palmas en las piernas", d:"La tormenta se aleja.", lvl:3, snd:3 },
-  { a:"Chasquear los dedos", d:"Quedan algunas gotas.", lvl:2, snd:2 },
-  { a:"Frotar las palmas", d:"Llovizna otra vez.", lvl:1, snd:1 },
-  { a:"Silencio", d:"", lvl:0, snd:0, q:1 }
+  { a:"Frotar las palmas", d:"", lvl:1, snd:0 },
+  { a:"Chasquear los dedos", d:"", lvl:2, snd:0 },
+  { a:"Palmas en las piernas", d:"", lvl:3, snd:0 },
+  { a:"Pisotones", d:"", lvl:4, snd:0 },
+  { a:"Pisotones", d:"¡Tormenta!", lvl:4, snd:4, r:1 },
+  { a:"Palmas en las piernas", d:"La tormenta se aleja.", lvl:3, snd:3, r:1 },
+  { a:"Chasquear los dedos", d:"Quedan algunas gotas.", lvl:2, snd:2, r:1 },
+  { a:"Frotar las palmas", d:"Llovizna otra vez.", lvl:1, snd:1, r:1 },
+  { a:"Silencio", d:"", lvl:0, snd:0, r:1, q:1 }
 ];
 let stormI = 0, stormRaf = 0, stormAudio = null;
-addScene({ id:"tormenta", label:"Tormenta con las manos", side:"Intro", num:"01", cls:"storm",
+addScene({ id:"tormenta", label:"Con las manos", side:"Intro", num:"01", cls:"storm",
   html:`<canvas id="rain" aria-hidden="true"></canvas><div class="inner">
-    <div class="eyebrow"><b>Pista 01</b> La tormenta</div>
+    <div class="eyebrow"><b>Pista 01</b> Con las manos</div>
     <div class="stormsteps" id="stormSteps">${STORM.map(() => "<i></i>").join("")}</div>
     <p class="action" id="stormAction">Silencio</p>
     <p class="lede" id="stormDesc"></p>
     <div class="howto" id="stormHow">
-      <div data-l="1"><b>1 · Llovizna</b>Frotar las palmas</div><div data-l="2"><b>2 · Gotas</b>Chasquear los dedos</div>
-      <div data-l="3"><b>3 · Aguacero</b>Palmas en las piernas</div><div data-l="4"><b>4 · Tormenta</b>Pisotones</div>
+      <div data-l="1" data-r="Llovizna"><b>1</b>Frotar las palmas</div><div data-l="2" data-r="Gotas"><b>2</b>Chasquear los dedos</div>
+      <div data-l="3" data-r="Aguacero"><b>3</b>Palmas en las piernas</div><div data-l="4" data-r="Tormenta"><b>4</b>Pisotones</div>
     </div>
   </div>`,
   enter(){ stormI = 0; renderStorm(); startRain(); },
@@ -784,7 +784,8 @@ function renderStorm(){
   $("#stormAction").textContent = s.a; $("#stormDesc").textContent = s.d;
   $$("#stormSteps i").forEach((el, i) => { el.classList.toggle("on", i < stormI); el.classList.toggle("cur", i === stormI); });
   $$("#stormHow div").forEach(el => el.classList.toggle("on", +el.dataset.l === s.lvl));
-  stormLevel = s.lvl; setStormAudio(s.snd); updateStepper();
+  $$("#stormHow div").forEach(el => { el.querySelector("b").textContent = s.r ? el.dataset.l + " · " + el.dataset.r : el.dataset.l; });
+  stormLevel = s.r ? s.lvl : 0; setStormAudio(s.snd); updateStepper();
 }
 let stormLevel = 0, drops = [];
 function startRain(){
